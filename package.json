@@ -1,0 +1,22 @@
+{
+  "name": "poker-note",
+  "version": "1.0.0",
+  "description": "德州扑克玩家买入和结算记录工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "jsonwebtoken": "^9.0.3",
+    "playwright": "^1.58.1",
+    "puppeteer-core": "^24.36.1"
+  }
+}

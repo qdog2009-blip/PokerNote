@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PokerNote - 德州扑克记录</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    @font-face {
+      font-family: 'Noto Sans SC';
+      src: url('/fonts/NotoSansSC.ttf') format('truetype');
+      font-weight: 400 700;
+    }
+    @font-face {
+      font-family: 'Noto Color Emoji';
+      src: url('/fonts/NotoColorEmoji.ttf') format('truetype');
+    }
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .emoji {
+      font-family: 'Noto Color Emoji', 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 登录页 -->
+    <div id="page-login" class="page active">
+      <div class="container">
+        <h1 class="emoji">🃏 德州扑克记录</h1>
+        <div class="card">
+          <div class="tabs">
+            <button class="tab active" data-tab="login">登录</button>
+            <button class="tab" data-tab="register">注册</button>
+          </div>
+          
+          <form id="form-login">
+            <div class="form-group">
+              <label>邮箱</label>
+              <input type="email" id="login-email" required placeholder="输入邮箱">
+            </div>
+            <div class="form-group">
+              <label>密码</label>
+              <input type="password" id="login-password" required placeholder="输入密码">
+            </div>
+            <button type="submit" class="btn primary">登录</button>
+          </form>
+          
+          <form id="form-register" style="display:none;">
+            <div class="form-group">
+              <label>邮箱</label>
+              <input type="email" id="reg-email" required placeholder="输入邮箱">
+            </div>
+            <div class="form-group">
+              <label>密码</label>
+              <input type="password" id="reg-password" required placeholder="设置密码" minlength="6">
+            </div>
+            <button type="submit" class="btn primary">注册</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 场次列表页 -->
+    <div id="page-sessions" class="page">
+      <header>
+        <h2>我的场次</h2>
+        <button id="btn-logout" class="btn small">登出</button>
+      </header>
+      <div class="container">
+        <button id="btn-new-session" class="btn primary block">+ 创建新场次</button>
+        <div id="sessions-list" class="list"></div>
+      </div>
+    </div>
+    
+    <!-- 场次详情页 -->
+    <div id="page-session" class="page">
+      <header>
+        <button class="btn back" onclick="showPage('page-sessions')">← 返回</button>
+        <h2 id="session-title">场次详情</h2>
+        <button class="btn small" onclick="showSessionStats()">📊 统计</button>
+      </header>
+      <div class="container">
+        <div class="section">
+          <h3>添加玩家</h3>
+          <div class="input-row">
+            <input type="text" id="player-name" list="player-history" placeholder="玩家姓名" autocomplete="off">
+            <datalist id="player-history"></datalist>
+            <input type="number" id="player-initial" placeholder="带入(可选)" style="width:100px">
+            <button class="btn" onclick="addPlayer()">添加</button>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>玩家列表</h3>
+          <div class="input-row" style="margin-bottom:12px;">
+            <button class="btn success" onclick="openBuyinModal()" style="flex:1;">💰</button>
+          </div>
+          <div id="players-list" class="list"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 买入弹窗 -->
+    <div id="modal-buyin" class="modal">
+      <div class="modal-content">
+        <h3>买入</h3>
+        <div class="buyin-player-list" id="buyin-player-list"></div>
+        <input type="number" id="buyin-amount-input" placeholder="买入金额">
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('modal-buyin')">取消</button>
+          <button class="btn primary" onclick="confirmBuyin()">确认</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 玩家详情页 -->
+    <div id="page-player" class="page">
+      <header>
+        <button class="btn back" onclick="goBack()">← 返回</button>
+        <h2 id="player-title">玩家详情</h2>
+      </header>
+      <div class="container">
+        <div class="stats-card">
+          <div class="stat">
+            <span class="label">总买入</span>
+            <span class="value" id="player-total-buyin">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">结余</span>
+            <span class="value" id="player-final">-</span>
+          </div>
+          <div class="stat">
+            <span class="label">战绩</span>
+            <span class="value" id="player-profit">-</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>买入记录</h3>
+          <div class="input-row">
+            <input type="number" id="buyin-amount" placeholder="买入金额">
+            <button class="btn" onclick="addBuyin()">💰</button>
+          </div>
+          <div id="buyins-list" class="list small"></div>
+        </div>
+        
+        <div class="section">
+          <h3>结算</h3>
+          <div class="settlement">
+            <div class="input-row">
+              <input type="number" id="settle-balance" placeholder="结余金额">
+              <button class="btn" onclick="settle('balance')">确认结余</button>
+            </div>
+            <div class="divider">或</div>
+            <div class="input-row">
+              <input type="number" id="settle-profit" placeholder="水上多少">
+              <button class="btn success" onclick="settle('profit')">水上</button>
+              <button class="btn danger" onclick="settle('loss')">水下</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 统计页 -->
+    <div id="page-stats" class="page">
+      <header>
+        <button class="btn back" onclick="goBack()">← 返回</button>
+        <h2>本场统计</h2>
+      </header>
+      <div class="container">
+        <div class="summary-card">
+          <div class="summary-row">
+            <span>总买入</span>
+            <span id="stat-total-buyin">0</span>
+          </div>
+          <div class="summary-row">
+            <span>结算总额</span>
+            <span id="stat-total-settled">0</span>
+          </div>
+          <div class="summary-row error" id="stat-error-row">
+            <span>误差</span>
+            <span id="stat-error">0</span>
+          </div>
+        </div>
+        <div id="stats-list" class="list"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 创建场次弹窗 -->
+  <div id="modal-session" class="modal">
+    <div class="modal-content">
+      <h3>创建新场次</h3>
+      <input type="text" id="session-name" placeholder="场次名称 (如: 2024年1月周五局)">
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modal-session')">取消</button>
+        <button class="btn primary" onclick="createSession()">创建</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="js/app.js"></script>
+</body>
+</html>
