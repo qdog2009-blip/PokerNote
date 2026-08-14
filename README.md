@@ -13,7 +13,7 @@
 
 | 功能 | 说明 |
 |------|------|
-| 📧 用户认证 | 邮箱注册/登录，数据隔离 |
+| 📧 用户认证 | 邮箱注册/登录，数据库 Token 验证与数据隔离 |
 | 🎰 场次管理 | 创建/删除游戏场次 |
 | 🗂️ 分组统计 | 默认分组兜底，可按自定义分组汇总多场游戏与玩家战绩 |
 | 👥 玩家管理 | 添加玩家 + 首次带入，支持历史姓名自动补全 |
@@ -28,7 +28,7 @@
 - **前端**：原生 HTML5 + CSS3 + JavaScript（无框架依赖）
 - **后端**：PHP 7.4（原生 REST API，无框架依赖）
 - **数据库**：SQLite（PDO SQLite）
-- **认证**：PHP Session + bcrypt
+- **认证**：数据库持久化随机 Token + bcrypt
 
 ## 🚀 快速开始
 
@@ -86,26 +86,21 @@ nohup php -S 0.0.0.0:3000 -t public router.php > /tmp/PokerNote.log 2>&1 &
 </Directory>
 ```
 
-PHP 进程必须对项目根目录具有写权限，以便创建和更新 `toolbox.db`。生产环境还应将 PHP Session 保存目录配置到可持久化、不可公开访问的位置。
+PHP 进程必须对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
 
 如需把数据库放到其他位置，可在启动 PHP 前设置 `POKERNOTE_DB_PATH` 为 SQLite 文件的绝对路径。
 
-### Nginx 反向代理
+### Nginx + PHP 7.4 部署
 
-项目提供了可直接修改的配置模板：`deploy/nginx/pokernote.conf`。先让 PHP 服务只监听本机地址：
+如果现有站点通过 `php7.inc` 连接 PHP-FPM，可直接使用 `deploy/nginx/pokernote.conf`。模板已经按以下环境配置：
 
-```bash
-php -S 127.0.0.1:3000 -t public router.php
-```
+- 域名：`p.txtcc.com`
+- 证书：`ssl/star.txtcc.com.cer`、`ssl/star.txtcc.com.key`
+- 网站目录：`/serverdata/wwwroot/nick/PokerNote/public`
+- PHP 配置：`php7.inc`
+- 公共配置：`common.inc`
 
-Windows 使用 `start.cmd` 时可这样设置：
-
-```bat
-set POKERNOTE_BIND_ADDRESS=127.0.0.1
-start.cmd
-```
-
-复制配置并把其中的 `pokernote.example.com` 改成实际域名：
+如实际项目目录不同，只需修改配置中的 `root`。确认公用的 `php7.inc` 指向 PHP 7.4 FPM即可，不需要修改 `php7.inc`。然后复制配置并重载 Nginx：
 
 ```bash
 sudo cp deploy/nginx/pokernote.conf /etc/nginx/conf.d/pokernote.conf
@@ -113,7 +108,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-模板会代理全部页面、静态资源和 `/api/` 请求，并传递客户端 IP、域名及访问协议。若 HTTPS 由 Nginx 终止，应用会根据 `X-Forwarded-Proto` 自动为登录 Cookie 启用 `Secure`。证书可使用 Certbot 配置，完成后再次运行 `nginx -t` 并重载 Nginx。
+该模式不需要运行 `php -S 127.0.0.1:3000`。Nginx 会直接提供 HTML、CSS、JavaScript 和字体文件，`/api` 与 `/api/` 下的请求会重写到 `public/index.php`，再由 `php7.inc` 交给 PHP-FPM。PHP-FPM 的运行用户需要对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
+
+登录或注册成功后，后端会生成随机 Token，仅把 SHA-256 哈希保存到数据库，浏览器将 Token 原文持久化到 `localStorage`，后续请求通过普通的 `X-PokerNote-Token` 请求头验证，无需修改公用 PHP-FPM 配置。后端也兼容 `Authorization: Bearer`。Token 不自动过期；主动退出会删除当前 Token，修改密码会撤销该账号的全部旧 Token并签发新 Token。替换数据库后，原数据库签发的 Token 会自动失效，需要重新登录。
 
 ## 📖 使用流程
 
@@ -179,7 +176,7 @@ PokerNote/
 ├── composer.json      # PHP 7.4 与扩展要求
 ├── deploy/
 │   └── nginx/
-│       └── pokernote.conf  # Nginx 反向代理模板
+│       └── pokernote.conf  # Nginx + PHP-FPM 部署模板
 ├── router.php         # PHP 内置服务器路由
 ├── src/
 │   ├── Application.php  # API 路由与业务逻辑
@@ -199,6 +196,7 @@ PokerNote/
 ## 💾 数据存储
 
 - 所有数据存储在本地 `toolbox.db` 文件
+- 登录 Token 的 SHA-256 哈希也保存在数据库中，Token 原文只保留在浏览器 `localStorage`
 - 支持数据持久化，重启后数据不丢失
 - 数据文件位于项目根目录
 - 原 Node.js 版本同样使用 `toolbox.db`，升级后可直接沿用已有数据库

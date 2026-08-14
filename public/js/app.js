@@ -3,6 +3,7 @@ let currentUser = null;
 let sessions = [];
 let groups = [];
 let currentSession = null;
+let currentSessionPlayers = [];
 let currentGroup = null;
 let currentPlayer = null;
 let selectedBuyinPlayerId = null;
@@ -12,22 +13,64 @@ let toastTimer = null;
 
 // API基础URL
 const API_BASE = '/api';
+const AUTH_TOKEN_STORAGE_KEY = 'pokernoteAuthToken';
 
 // ==================== 工具函数 ====================
 
 async function api(path, options = {}) {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  if (token) {
+    headers['X-PokerNote-Token'] = token;
+  }
+
   const res = await fetch(API_BASE + path, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    },
-    ...options
+    ...options,
+    headers
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || '请求失败');
+    if (res.status === 401 && path !== '/login') {
+      clearAuthToken();
+      currentUser = null;
+      if (path !== '/me') showPage('page-login');
+    }
+    const error = new Error(data.error || '请求失败');
+    error.status = res.status;
+    throw error;
   }
   return data;
+}
+
+function getAuthToken() {
+  try {
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    return typeof token === 'string' && /^[a-f0-9]{64}$/i.test(token) ? token : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setAuthToken(token) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token)) {
+    throw new Error('服务器未返回有效的登录凭证');
+  }
+  try {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } catch (error) {
+    throw new Error('浏览器无法保存登录状态，请允许使用本地存储');
+  }
+}
+
+function clearAuthToken() {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch (error) {
+    // 无法访问存储时，当前页面仍会退出登录状态。
+  }
 }
 
 function formatMoney(num) {
@@ -268,6 +311,12 @@ function closeModal(modalId) {
 // ==================== 认证相关 ====================
 
 async function checkAuth() {
+  if (!getAuthToken()) {
+    currentUser = null;
+    showPage('page-login');
+    return;
+  }
+
   try {
     currentUser = await api('/me');
     showPage('page-sessions');
@@ -275,7 +324,10 @@ async function checkAuth() {
     await loadSessions();
     await loadAccountPlayerHistory();
   } catch (err) {
+    if (err.status === 401) clearAuthToken();
+    currentUser = null;
     showPage('page-login');
+    if (err.status !== 401) alert(err.message);
   }
 }
 
@@ -284,10 +336,11 @@ async function login(e) {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   try {
-    await api('/login', {
+    const result = await api('/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+    setAuthToken(result.token);
     await checkAuth();
   } catch (err) {
     alert(err.message);
@@ -299,10 +352,11 @@ async function register(e) {
   const email = document.getElementById('reg-email').value;
   const password = document.getElementById('reg-password').value;
   try {
-    await api('/register', {
+    const result = await api('/register', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+    setAuthToken(result.token);
     await checkAuth();
   } catch (err) {
     if (err.message.includes('已注册') || err.message.includes('already')) {
@@ -320,10 +374,15 @@ async function register(e) {
 }
 
 async function logout() {
-  await api('/logout', { method: 'POST' });
-  currentUser = null;
-  accountPlayerHistory = [];
-  showPage('page-login');
+  try {
+    await api('/logout', { method: 'POST' });
+  } finally {
+    clearAuthToken();
+    currentUser = null;
+    currentSessionPlayers = [];
+    accountPlayerHistory = [];
+    showPage('page-login');
+  }
 }
 
 // ==================== 场次相关 ====================
@@ -483,6 +542,7 @@ async function openSession(id) {
 
 async function loadPlayers() {
   const data = await api('/sessions/' + currentSession.id);
+  currentSessionPlayers = Array.isArray(data.players) ? data.players : [];
   const list = document.getElementById('players-list');
   const rakeRate = Number(data.rake_rate || 0);
   currentSession.rakeRate = rakeRate;
@@ -547,10 +607,10 @@ async function loadPlayers() {
     }
     
     return `
-      <div class="list-item" onclick="openPlayer(${p.id}, '${p.name}')">
+      <div class="list-item" onclick="openPlayer(${p.id})">
         <div class="info">
           <div class="name">
-            ${p.name}
+            ${escapeHtml(p.name)}
             ${isSettled ? '<span class="settled-badge">已结算</span>' : ''}
           </div>
           <div class="meta">${isSettled ? '' : '累计: ' + formatMoney(p.total_buyin)}</div>
@@ -619,6 +679,7 @@ async function deletePlayer(id) {
 // 打开买入弹窗
 async function openBuyinModal() {
   const data = await api('/sessions/' + currentSession.id);
+  currentSessionPlayers = Array.isArray(data.players) ? data.players : [];
   const unsettledPlayers = data.players.filter(p => p.final_balance === null);
   
   if (unsettledPlayers.length === 0) {
@@ -628,9 +689,9 @@ async function openBuyinModal() {
   
   const list = document.getElementById('buyin-player-list');
   list.innerHTML = unsettledPlayers.map(p => `
-    <div class="buyin-player-item" onclick="selectBuyinPlayer(${p.id}, '${p.name}', this)">
+    <div class="buyin-player-item" onclick="selectBuyinPlayer(${p.id}, this)">
       <div>
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${escapeHtml(p.name)}</div>
         <div class="player-buyin">累计: ${formatMoney(p.total_buyin)}</div>
       </div>
       <span class="check" style="display:none;">✓</span>
@@ -643,7 +704,7 @@ async function openBuyinModal() {
 }
 
 // 选择买入玩家
-function selectBuyinPlayer(id, name, element) {
+function selectBuyinPlayer(id, element) {
   document.querySelectorAll('.buyin-player-item').forEach(el => {
     el.classList.remove('selected');
     el.querySelector('.check').style.display = 'none';
@@ -711,7 +772,10 @@ async function addPlayer() {
   }
 }
 
-async function openPlayer(id, name) {
+async function openPlayer(id) {
+  const player = currentSessionPlayers.find(item => Number(item.id) === Number(id));
+  if (!player) return;
+  const name = player.name;
   currentPlayer = { id, name };
   document.getElementById('player-title').textContent = name;
   const editable = currentSession && canInput(currentSession.accessLevel);
@@ -863,7 +927,7 @@ async function showSessionStats() {
       return `
         <div class="list-item">
           <div class="info">
-            <div class="name">${p.name}</div>
+            <div class="name">${escapeHtml(p.name)}</div>
             <div class="meta">买入 ${formatMoney(p.buyin)}${p.final !== null ? ` · 结余 ${formatMoney(p.final)}` : ''}</div>
           </div>
           <div class="player-result">
@@ -1034,10 +1098,11 @@ async function changePassword() {
   }
 
   try {
-    await api('/change-password', {
+    const result = await api('/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword })
     });
+    setAuthToken(result.token);
     closeModal('modal-change-password');
   } catch (err) {
     alert(err.message);

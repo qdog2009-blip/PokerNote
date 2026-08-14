@@ -1,4 +1,6 @@
 DirectoryIndex index.html
 
 RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^api(?:/.*)?$ index.php [L,QSA]

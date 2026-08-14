@@ -47,6 +47,16 @@ final class Database
         );
 
         $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS auth_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )'
+        );
+
+        $pdo->exec(
             'CREATE TABLE IF NOT EXISTS session_groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -123,6 +133,7 @@ final class Database
         );
 
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON auth_tokens(user_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_sessions_group_id ON sessions(group_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_session_groups_user_id ON session_groups(user_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_group_shares_group_id ON group_shares(group_id)');

@@ -21,10 +21,12 @@ final class HttpException extends RuntimeException
 final class Application
 {
     private $pdo;
+    private $authenticatedUser;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->authenticatedUser = null;
     }
 
     public function handle(string $method, string $path): void
@@ -55,7 +57,10 @@ final class Application
 
         if ($method === 'GET' && $path === '/api/me') {
             $userId = $this->requireUser();
-            $this->json(['userId' => $userId, 'email' => (string) $_SESSION['email']]);
+            $this->json([
+                'userId' => $userId,
+                'email' => (string) $this->authenticatedUser['email'],
+            ]);
         }
 
         if ($method === 'POST' && $path === '/api/change-password') {
@@ -181,8 +186,13 @@ final class Application
 
         $userId = (int) $this->pdo->lastInsertId();
         $this->defaultGroup($userId);
-        $this->setAuthenticatedUser($userId, $email);
-        $this->json(['success' => true, 'userId' => $userId, 'email' => $email]);
+        $token = $this->issueAuthToken($userId);
+        $this->json([
+            'success' => true,
+            'userId' => $userId,
+            'email' => $email,
+            'token' => $token,
+        ]);
     }
 
     private function login(): void
@@ -202,29 +212,22 @@ final class Application
         $userId = (int) $user['id'];
         $storedEmail = (string) $user['email'];
         $this->defaultGroup($userId);
-        $this->setAuthenticatedUser($userId, $storedEmail);
-        $this->json(['success' => true, 'userId' => $userId, 'email' => $storedEmail]);
+        $token = $this->issueAuthToken($userId);
+        $this->json([
+            'success' => true,
+            'userId' => $userId,
+            'email' => $storedEmail,
+            'token' => $token,
+        ]);
     }
 
     private function logout(): void
     {
-        $_SESSION = [];
-        if (ini_get('session.use_cookies')) {
-            $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                [
-                    'expires' => time() - 42000,
-                    'path' => $params['path'],
-                    'domain' => $params['domain'],
-                    'secure' => (bool) $params['secure'],
-                    'httponly' => (bool) $params['httponly'],
-                    'samesite' => isset($params['samesite']) ? $params['samesite'] : 'Lax',
-                ]
-            );
+        $token = $this->requestAuthToken();
+        if ($token !== null) {
+            $statement = $this->pdo->prepare('DELETE FROM auth_tokens WHERE token_hash = ?');
+            $statement->execute([hash('sha256', $token)]);
         }
-        session_destroy();
         $this->json(['success' => true]);
     }
 
@@ -249,9 +252,14 @@ final class Application
             throw new RuntimeException('无法生成密码哈希');
         }
         $statement = $this->pdo->prepare('UPDATE users SET password = ? WHERE id = ?');
-        $statement->execute([$passwordHash, $userId]);
-        session_regenerate_id(true);
-        $this->json(['success' => true]);
+        $newToken = '';
+        $this->transaction(function () use ($statement, $passwordHash, $userId, &$newToken): void {
+            $statement->execute([$passwordHash, $userId]);
+            $deleteTokens = $this->pdo->prepare('DELETE FROM auth_tokens WHERE user_id = ?');
+            $deleteTokens->execute([$userId]);
+            $newToken = $this->issueAuthToken($userId);
+        });
+        $this->json(['success' => true, 'token' => $newToken]);
     }
 
     private function createGroup(int $userId): void
@@ -952,17 +960,75 @@ final class Application
 
     private function requireUser(): int
     {
-        if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
+        if ($this->authenticatedUser !== null) {
+            return (int) $this->authenticatedUser['id'];
+        }
+
+        $token = $this->requestAuthToken();
+        if ($token === null) {
             throw new HttpException(401, '请先登录');
         }
-        return (int) $_SESSION['user_id'];
+
+        $statement = $this->pdo->prepare(
+            'SELECT u.id, u.email
+             FROM auth_tokens token
+             INNER JOIN users u ON u.id = token.user_id
+             WHERE token.token_hash = ?
+             LIMIT 1'
+        );
+        $statement->execute([hash('sha256', $token)]);
+        $user = $statement->fetch();
+        if ($user === false) {
+            throw new HttpException(401, '登录已失效，请重新登录');
+        }
+
+        $this->authenticatedUser = [
+            'id' => (int) $user['id'],
+            'email' => (string) $user['email'],
+        ];
+        return (int) $this->authenticatedUser['id'];
     }
 
-    private function setAuthenticatedUser(int $userId, string $email): void
+    private function issueAuthToken(int $userId): string
     {
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = $userId;
-        $_SESSION['email'] = $email;
+        $token = bin2hex(random_bytes(32));
+        $statement = $this->pdo->prepare(
+            'INSERT INTO auth_tokens (user_id, token_hash) VALUES (?, ?)'
+        );
+        $statement->execute([$userId, hash('sha256', $token)]);
+        return $token;
+    }
+
+    private function requestAuthToken(): ?string
+    {
+        if (
+            isset($_SERVER['HTTP_X_POKERNOTE_TOKEN'])
+            && preg_match('/^[a-f0-9]{64}$/i', trim((string) $_SERVER['HTTP_X_POKERNOTE_TOKEN'])) === 1
+        ) {
+            return strtolower(trim((string) $_SERVER['HTTP_X_POKERNOTE_TOKEN']));
+        }
+
+        $authorization = null;
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $authorization = (string) $_SERVER['HTTP_AUTHORIZATION'];
+        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $authorization = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        } elseif (function_exists('getallheaders')) {
+            foreach (getallheaders() as $name => $value) {
+                if (strcasecmp((string) $name, 'Authorization') === 0) {
+                    $authorization = (string) $value;
+                    break;
+                }
+            }
+        }
+
+        if (
+            $authorization === null
+            || preg_match('/^Bearer\s+([a-f0-9]{64})$/i', trim($authorization), $matches) !== 1
+        ) {
+            return null;
+        }
+        return strtolower($matches[1]);
     }
 
     private function accessibleSession(int $sessionId, int $userId, string $requiredPermission): array

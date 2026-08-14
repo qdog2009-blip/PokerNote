@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require dirname(__DIR__) . '/src/Database.php';
+
 if (!in_array('sqlite', PDO::getAvailableDrivers(), true)) {
     fwrite(STDERR, "SKIP: pdo_sqlite is not enabled\n");
     exit(2);
@@ -21,7 +23,7 @@ function request(
     string $method,
     string $url,
     ?array $body = null,
-    ?string $cookie = null,
+    ?string $token = null,
     array $additionalHeaders = []
 ): array
 {
@@ -31,8 +33,8 @@ function request(
         $headers[] = 'Content-Type: application/json';
         $content = (string) json_encode($body, JSON_UNESCAPED_UNICODE);
     }
-    if ($cookie !== null) {
-        $headers[] = 'Cookie: ' . $cookie;
+    if ($token !== null) {
+        $headers[] = 'X-PokerNote-Token: ' . $token;
     }
 
     $context = stream_context_create([
@@ -59,71 +61,11 @@ function request(
     ];
 }
 
-function cookieFromHeaders(array $headers): ?string
-{
-    foreach ($headers as $header) {
-        if (stripos($header, 'Set-Cookie:') === 0) {
-            $cookie = trim(explode(';', substr($header, strlen('Set-Cookie:')), 2)[0]);
-            return $cookie !== '' ? $cookie : null;
-        }
-    }
-
-    return null;
-}
-
-function hasPersistentSessionCookie(array $headers): bool
-{
-    foreach ($headers as $header) {
-        if (stripos($header, 'Set-Cookie: pokernote_session=') !== 0) {
-            continue;
-        }
-        if (preg_match('/Max-Age=(\d+)/i', $header, $matches) !== 1) {
-            continue;
-        }
-        if (
-            (int) $matches[1] >= 315359900
-            && stripos($header, 'HttpOnly') !== false
-            && stripos($header, 'SameSite=Lax') !== false
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function hasExpiredSessionCookie(array $headers): bool
-{
-    foreach ($headers as $header) {
-        if (
-            stripos($header, 'Set-Cookie: pokernote_session=') === 0
-            && preg_match('/Max-Age=0/i', $header) === 1
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function hasSecureSessionCookie(array $headers): bool
-{
-    foreach ($headers as $header) {
-        if (
-            stripos($header, 'Set-Cookie: pokernote_session=') === 0
-            && preg_match('/;\s*Secure(?:;|$)/i', $header) === 1
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 $databasePath = tempnam(sys_get_temp_dir(), 'pokernote-api-');
 if ($databasePath === false) {
     throw new RuntimeException('Unable to create the temporary database');
 }
+$replacementDatabasePath = null;
 
 $socket = stream_socket_server('tcp://127.0.0.1:0', $socketErrorNumber, $socketErrorMessage);
 if ($socket === false) {
@@ -193,43 +135,56 @@ try {
     $credentials = ['email' => $email, 'password' => 'test-pass-74'];
     $register = request('POST', $baseUrl . '/api/register', $credentials);
     assertTrue($register['status'] === 200 && ($register['body']['success'] ?? false) === true, 'Registration failed');
+    $registrationCookies = array_filter($register['headers'], function (string $header): bool {
+        return stripos($header, 'Set-Cookie:') === 0;
+    });
+    assertTrue(count($registrationCookies) === 0, 'Registration still created a PHP session cookie');
 
-    $cookie = cookieFromHeaders($register['headers']);
-    assertTrue($cookie !== null, 'Registration did not create a session cookie');
-    assertTrue(hasPersistentSessionCookie($register['headers']), 'Registration cookie is not persistent and secure');
+    $token = $register['body']['token'] ?? null;
+    assertTrue(is_string($token) && preg_match('/^[a-f0-9]{64}$/', $token) === 1, 'Registration did not return a random token');
+    $inspection = new PDO('sqlite:' . $databasePath);
+    $storedTokenHash = $inspection->query('SELECT token_hash FROM auth_tokens LIMIT 1')->fetchColumn();
+    $inspection = null;
+    assertTrue($storedTokenHash === hash('sha256', $token), 'The token hash was not persisted');
+    assertTrue($storedTokenHash !== $token, 'The raw token was persisted in the database');
 
-    $groups = request('GET', $baseUrl . '/api/groups', null, $cookie);
+    $legacyCookieRequest = request(
+        'GET',
+        $baseUrl . '/api/me',
+        null,
+        null,
+        ['Cookie: pokernote_session=legacy-session-id']
+    );
+    assertTrue($legacyCookieRequest['status'] === 401, 'A legacy PHP session cookie was accepted');
+
+    $groups = request('GET', $baseUrl . '/api/groups', null, $token);
     assertTrue($groups['status'] === 200, 'Unable to load groups after registration');
     assertTrue(count($groups['body']) === 1, 'Registration did not create exactly one default group');
     assertTrue(($groups['body'][0]['name'] ?? null) === '默认分组', 'The default group has an unexpected name');
     assertTrue(($groups['body'][0]['is_default'] ?? false) === true, 'The default group flag is missing');
 
-    $persistentSession = request('GET', $baseUrl . '/api/me', null, $cookie);
-    assertTrue($persistentSession['status'] === 200, 'Persistent session cannot restore the signed-in user');
-    assertTrue(hasPersistentSessionCookie($persistentSession['headers']), 'Authenticated activity did not renew the persistent cookie');
-
-    $proxiedHttpsSession = request(
+    $persistentLogin = request('GET', $baseUrl . '/api/me', null, $token);
+    assertTrue($persistentLogin['status'] === 200, 'The persisted token cannot restore the signed-in user');
+    assertTrue(($persistentLogin['body']['email'] ?? null) === $email, 'The token resolved to the wrong user');
+    $bearerCompatibility = request(
         'GET',
         $baseUrl . '/api/me',
         null,
-        $cookie,
-        ['X-Forwarded-Proto: https']
+        null,
+        ['Authorization: Bearer ' . $token]
     );
-    assertTrue($proxiedHttpsSession['status'] === 200, 'HTTPS proxy request cannot restore the signed-in user');
-    assertTrue(hasSecureSessionCookie($proxiedHttpsSession['headers']), 'HTTPS proxy session cookie is missing Secure');
+    assertTrue($bearerCompatibility['status'] === 200, 'Bearer token compatibility is broken');
 
-    $logout = request('POST', $baseUrl . '/api/logout', null, $cookie);
+    $logout = request('POST', $baseUrl . '/api/logout', null, $token);
     assertTrue($logout['status'] === 200 && ($logout['body']['success'] ?? false) === true, 'Logout failed');
-    assertTrue(hasExpiredSessionCookie($logout['headers']), 'Logout did not clear the persistent session cookie');
-    $loggedOutSession = request('GET', $baseUrl . '/api/me', null, $cookie);
-    assertTrue($loggedOutSession['status'] === 401, 'The old persistent session still works after logout');
+    $loggedOutSession = request('GET', $baseUrl . '/api/me', null, $token);
+    assertTrue($loggedOutSession['status'] === 401, 'The old token still works after logout');
 
-    $login = request('POST', $baseUrl . '/api/login', $credentials, $cookie);
+    $login = request('POST', $baseUrl . '/api/login', $credentials);
     assertTrue($login['status'] === 200 && ($login['body']['success'] ?? false) === true, 'Login after registration failed');
-    assertTrue(hasPersistentSessionCookie($login['headers']), 'Login cookie is not persistent and secure');
-
-    $authenticatedCookie = cookieFromHeaders($login['headers']);
-    assertTrue($authenticatedCookie !== null, 'Login did not create a new session cookie');
+    $authenticatedCookie = $login['body']['token'] ?? null;
+    assertTrue(is_string($authenticatedCookie) && preg_match('/^[a-f0-9]{64}$/', $authenticatedCookie) === 1, 'Login did not return a token');
+    assertTrue($authenticatedCookie !== $token, 'Login reused the registration token');
     $groupId = (int) $groups['body'][0]['id'];
 
     $defaultGroupDelete = request('DELETE', $baseUrl . '/api/groups/' . $groupId, null, $authenticatedCookie);
@@ -393,8 +348,8 @@ try {
         'password' => 'test-pass-74',
     ];
     $otherRegister = request('POST', $baseUrl . '/api/register', $otherCredentials);
-    $otherCookie = cookieFromHeaders($otherRegister['headers']);
-    assertTrue($otherCookie !== null, 'Unable to create the second user session');
+    $otherCookie = $otherRegister['body']['token'] ?? null;
+    assertTrue(is_string($otherCookie), 'Unable to create the second user token');
 
     $foreignExpense = request(
         'POST',
@@ -531,6 +486,9 @@ try {
         $authenticatedCookie
     );
     assertTrue($wrongPassword['status'] === 400, 'Password changed without the current password');
+    $secondDeviceLogin = request('POST', $baseUrl . '/api/login', $credentials);
+    $secondDeviceToken = $secondDeviceLogin['body']['token'] ?? null;
+    assertTrue(is_string($secondDeviceToken), 'Unable to issue a token for a second device');
     $passwordChange = request(
         'POST',
         $baseUrl . '/api/change-password',
@@ -538,8 +496,15 @@ try {
         $authenticatedCookie
     );
     assertTrue($passwordChange['status'] === 200, 'Unable to change password');
-    $changedPasswordCookie = cookieFromHeaders($passwordChange['headers']);
-    assertTrue($changedPasswordCookie !== null, 'Password change did not rotate the session id');
+    $changedPasswordToken = $passwordChange['body']['token'] ?? null;
+    assertTrue(is_string($changedPasswordToken), 'Password change did not return a new token');
+    assertTrue($changedPasswordToken !== $authenticatedCookie, 'Password change did not rotate the token');
+    $revokedPasswordToken = request('GET', $baseUrl . '/api/me', null, $authenticatedCookie);
+    assertTrue($revokedPasswordToken['status'] === 401, 'Password change did not revoke the old token');
+    $revokedSecondDevice = request('GET', $baseUrl . '/api/me', null, $secondDeviceToken);
+    assertTrue($revokedSecondDevice['status'] === 401, 'Password change did not revoke another device token');
+    $changedPasswordSession = request('GET', $baseUrl . '/api/me', null, $changedPasswordToken);
+    assertTrue($changedPasswordSession['status'] === 200, 'The token issued after password change is invalid');
 
     $oldPasswordLogin = request('POST', $baseUrl . '/api/login', $credentials);
     assertTrue($oldPasswordLogin['status'] === 401, 'Old password still works after changing it');
@@ -549,8 +514,23 @@ try {
         ['email' => $credentials['email'], 'password' => 'new-test-pass-74']
     );
     assertTrue($newPasswordLogin['status'] === 200, 'New password cannot log in');
+    $newPasswordToken = $newPasswordLogin['body']['token'] ?? null;
+    assertTrue(is_string($newPasswordToken) && $newPasswordToken !== $changedPasswordToken, 'A new login did not issue a unique token');
 
-    echo "PASS: password change, view/input sharing, revocation, and existing accounting\n";
+    $replacementDatabasePath = tempnam(sys_get_temp_dir(), 'pokernote-replacement-');
+    assertTrue($replacementDatabasePath !== false, 'Unable to create a replacement database');
+    $replacementDatabase = Database::connect($replacementDatabasePath);
+    $replacementPassword = password_hash('replacement-password', PASSWORD_BCRYPT, ['cost' => 10]);
+    $replacementInsert = $replacementDatabase->prepare('INSERT INTO users (email, password) VALUES (?, ?)');
+    $replacementInsert->execute(['replacement@example.com', $replacementPassword]);
+    $replacementInsert = null;
+    $replacementDatabase = null;
+    assertTrue(copy($replacementDatabasePath, $databasePath), 'Unable to replace the active database');
+
+    $tokenAfterDatabaseReplacement = request('GET', $baseUrl . '/api/me', null, $newPasswordToken);
+    assertTrue($tokenAfterDatabaseReplacement['status'] === 401, 'A token from the old database survived database replacement');
+
+    echo "PASS: database tokens, replacement invalidation, sharing, and existing accounting\n";
 } finally {
     proc_terminate($process);
     foreach ($pipes as $pipe) {
@@ -569,5 +549,8 @@ try {
     }
     if (is_file($serverLogPath)) {
         unlink($serverLogPath);
+    }
+    if (is_string($replacementDatabasePath) && is_file($replacementDatabasePath)) {
+        unlink($replacementDatabasePath);
     }
 }

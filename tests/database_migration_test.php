@@ -84,6 +84,12 @@ try {
     if ($shareTable === false) {
         throw new RuntimeException('The group share table was not created during migration');
     }
+    $authTokenTable = $migrated->query(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'auth_tokens'"
+    )->fetch();
+    if ($authTokenTable === false) {
+        throw new RuntimeException('The authentication token table was not created during migration');
+    }
 
     $migrated = null;
     Database::connect($databasePath);
