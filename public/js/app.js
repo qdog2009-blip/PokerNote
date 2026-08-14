@@ -14,6 +14,7 @@ let toastTimer = null;
 // API基础URL
 const API_BASE = '/api';
 const AUTH_TOKEN_STORAGE_KEY = 'pokernoteAuthToken';
+const LAST_RAKE_RATE_STORAGE_KEY = 'pokernoteLastRakeRate';
 
 // ==================== 工具函数 ====================
 
@@ -207,7 +208,7 @@ function getPlayerHistory() {
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 50);
+  });
 }
 
 function savePlayerName(name) {
@@ -216,7 +217,7 @@ function savePlayerName(name) {
     (item, index, names) => names.findIndex(
       candidate => candidate.toLocaleLowerCase() === item.toLocaleLowerCase()
     ) === index
-  ).slice(0, 50);
+  );
   const history = getLocalPlayerHistory().filter(
     item => item.toLocaleLowerCase() !== normalizedName.toLocaleLowerCase()
   );
@@ -494,10 +495,110 @@ async function createGroup() {
   }
 }
 
+function defaultSessionName() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return month + day;
+}
+
+function lastRakeRateStorageKey() {
+  return currentUser && currentUser.userId
+    ? `${LAST_RAKE_RATE_STORAGE_KEY}:${currentUser.userId}`
+    : LAST_RAKE_RATE_STORAGE_KEY;
+}
+
+function rememberRakeRate(rakeRate) {
+  try {
+    localStorage.setItem(lastRakeRateStorageKey(), String(rakeRate));
+  } catch (error) {
+    // 存储不可用时仍可正常创建场次。
+  }
+}
+
+function getLastRakeRate() {
+  try {
+    const stored = localStorage.getItem(lastRakeRateStorageKey());
+    if (stored !== null) {
+      const value = Number(stored);
+      if (Number.isFinite(value) && value >= 0 && value <= 100) return value;
+    }
+  } catch (error) {
+    // 回退到最近创建的场次。
+  }
+
+  const latestSession = sessions[0];
+  const latestRate = latestSession ? Number(latestSession.rake_rate) : 0;
+  return Number.isFinite(latestRate) ? latestRate : 0;
+}
+
+async function openCreateSessionPage() {
+  if (groups.length === 0) await loadGroups();
+  document.getElementById('session-name').value = defaultSessionName();
+  document.getElementById('session-create-rake-rate').value = getLastRakeRate();
+  document.getElementById('session-create-buyin').value = '';
+  updateGroupSelect('session-create-group');
+  renderCreatePlayerOptions();
+  showPage('page-session-create');
+  document.getElementById('session-name').focus();
+  document.getElementById('session-name').select();
+}
+
+function renderCreatePlayerOptions() {
+  const list = document.getElementById('session-create-player-list');
+  const names = getPlayerHistory();
+  if (names.length === 0) {
+    list.innerHTML = '<div class="create-player-empty">暂无历史玩家，可先创建空场次后在场次内添加玩家</div>';
+    updateCreatePlayerCount();
+    return;
+  }
+
+  list.innerHTML = names.map(name => `
+    <label class="create-player-option">
+      <input type="checkbox" value="${escapeHtml(name)}">
+      <span class="create-player-check" aria-hidden="true">✓</span>
+      <span class="create-player-name">${escapeHtml(name)}</span>
+    </label>
+  `).join('');
+  list.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      checkbox.closest('.create-player-option').classList.toggle('selected', checkbox.checked);
+      updateCreatePlayerCount();
+    });
+  });
+  updateCreatePlayerCount();
+}
+
+function updateCreatePlayerCount() {
+  const count = document.querySelectorAll('#session-create-player-list input:checked').length;
+  document.getElementById('session-create-player-count').textContent = `已选 ${count} 人`;
+}
+
+function setCreatePlayersSelected(selected) {
+  document.querySelectorAll('#session-create-player-list input[type="checkbox"]').forEach(checkbox => {
+    checkbox.checked = selected;
+    checkbox.closest('.create-player-option').classList.toggle('selected', selected);
+  });
+  updateCreatePlayerCount();
+}
+
+function selectAllCreatePlayers() {
+  setCreatePlayersSelected(true);
+}
+
+function clearCreatePlayers() {
+  setCreatePlayersSelected(false);
+}
+
 async function createSession() {
   const name = document.getElementById('session-name').value.trim();
   const rakeRate = parseFloat(document.getElementById('session-create-rake-rate').value);
   const groupId = parseInt(document.getElementById('session-create-group').value, 10);
+  const buyinValue = document.getElementById('session-create-buyin').value.trim();
+  const initialBuyin = buyinValue === '' ? 0 : parseFloat(buyinValue);
+  const playerNames = Array.from(
+    document.querySelectorAll('#session-create-player-list input:checked')
+  ).map(checkbox => checkbox.value);
   if (!name) {
     alert('请输入场次名称');
     return;
@@ -506,19 +607,41 @@ async function createSession() {
     alert('抽水比例必须在0到100之间');
     return;
   }
+  if (!groupId) {
+    alert('请选择分组');
+    return;
+  }
+  if (!Number.isFinite(initialBuyin) || initialBuyin < 0) {
+    alert('请输入有效的统一带入金额');
+    return;
+  }
+  if (playerNames.length > 0 && initialBuyin <= 0) {
+    alert('选择玩家后，统一带入金额必须大于0');
+    return;
+  }
+
+  const submitButton = document.getElementById('session-create-submit');
+  submitButton.disabled = true;
+  submitButton.textContent = '正在创建…';
   
   try {
-    await api('/sessions', {
+    const result = await api('/sessions', {
       method: 'POST',
-      body: JSON.stringify({ name, rakeRate, groupId })
+      body: JSON.stringify({ name, rakeRate, groupId, initialBuyin, playerNames })
     });
-    closeModal('modal-session');
-    document.getElementById('session-name').value = '';
-    document.getElementById('session-create-rake-rate').value = '0';
+    rememberRakeRate(rakeRate);
+    await loadAccountPlayerHistory();
     await loadGroups();
     await loadSessions();
+    if (pageHistory[pageHistory.length - 1] === 'page-session-create') {
+      pageHistory.pop();
+    }
+    await openSession(result.sessionId);
   } catch (err) {
     alert(err.message);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = '保存并创建';
   }
 }
 
@@ -537,7 +660,7 @@ async function openSession(id) {
   document.getElementById('session-title').textContent = session ? session.name : '场次详情';
   updatePlayerHistoryList(); // 加载历史姓名
   showPage('page-session');
-  loadPlayers();
+  await loadPlayers();
 }
 
 async function loadPlayers() {
@@ -564,6 +687,23 @@ async function loadPlayers() {
   updateGroupSelect('session-group-select', data.group_id);
 
   const settledPlayers = data.players.filter(player => player.final_balance !== null);
+  const finalRakeSetting = document.getElementById('session-final-rake-setting');
+  const finalRakeInput = document.getElementById('session-final-rake');
+  const finalRakeSave = document.getElementById('session-final-rake-save');
+  const isFullySettled = data.is_fully_settled === true;
+  finalRakeSetting.hidden = !isFullySettled;
+  if (isFullySettled) {
+    const calculatedRake = Number(data.calculated_rake || 0);
+    const effectiveRake = Number(data.effective_rake || 0);
+    currentSession.finalRake = data.final_rake;
+    currentSession.calculatedRake = calculatedRake;
+    finalRakeInput.value = Math.round(effectiveRake);
+    finalRakeInput.disabled = !editable;
+    finalRakeSave.hidden = !editable;
+    document.getElementById('session-final-rake-note').textContent = data.rake_overridden
+      ? `系统计算 ${formatRake(calculatedRake)}，当前统计使用已保存金额`
+      : `系统计算 ${formatRake(calculatedRake)}，保存后统计和水池以输入金额为准`;
+  }
   const errorSummary = document.getElementById('session-error-summary');
   if (settledPlayers.length > 0) {
     const totalBuyin = data.players.reduce(
@@ -659,10 +799,33 @@ async function saveRakeRate() {
       body: JSON.stringify({ rakeRate })
     });
     currentSession.rakeRate = Number(result.rakeRate);
+    rememberRakeRate(result.rakeRate);
     input.value = result.rakeRate;
     document.getElementById('session-rake-summary').textContent = formatRate(result.rakeRate);
     await loadPlayers();
     await loadSessions();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function saveFinalRake() {
+  const input = document.getElementById('session-final-rake');
+  const finalRake = Number(input.value);
+  if (!Number.isInteger(finalRake) || finalRake < 0) {
+    alert('最终抽水必须是大于等于0的整数');
+    return;
+  }
+
+  try {
+    const result = await api('/sessions/' + currentSession.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ finalRake })
+    });
+    currentSession.finalRake = result.finalRake;
+    await loadPlayers();
+    await loadSessions();
+    showToast(`最终抽水已保存为 ${formatRake(result.finalRake)}`);
   } catch (err) {
     alert(err.message);
   }
@@ -904,6 +1067,9 @@ async function showSessionStats() {
     document.getElementById('stat-total-buyin').textContent = formatMoney(data.totalBuyins);
     document.getElementById('stat-total-settled').textContent = formatMoney(data.totalSettled);
     document.getElementById('stat-rake-rate').textContent = formatRate(data.rakeRate);
+    document.getElementById('stat-total-rake-label').textContent = data.isRakeOverridden
+      ? '最终抽水（手动）'
+      : '盈利玩家抽水';
     document.getElementById('stat-total-rake').textContent = formatRake(data.totalRake);
     renderWaterPool('stat', data.waterPool);
     document.getElementById('stat-net-settled').textContent = formatMoney(data.totalNetSettled);
@@ -970,7 +1136,7 @@ async function showGroupStats(groupId, navigate = true) {
           <div class="list-item group-session-stat" onclick="openSession(${session.id})">
             <div class="info">
               <div class="name">${escapeHtml(session.name)}</div>
-              <div class="meta">${session.playerCount}人 · ${session.settledCount}人已结算 · 抽水 ${formatRate(session.rakeRate)}</div>
+              <div class="meta">${session.playerCount}人 · ${session.settledCount}人已结算 · ${session.isFullySettled ? `最终抽水 ${formatRake(session.totalRake)}` : `抽水 ${formatRate(session.rakeRate)}`}</div>
             </div>
             <div class="player-result">
               <div class="amount">${formatMoney(session.totalNetSettled)}</div>
@@ -1190,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('form-register').addEventListener('submit', register);
   document.getElementById('btn-logout').addEventListener('click', logout);
   document.getElementById('btn-change-password').addEventListener('click', openChangePasswordModal);
-  document.getElementById('btn-new-session').addEventListener('click', () => openModal('modal-session'));
+  document.getElementById('btn-new-session').addEventListener('click', openCreateSessionPage);
   document.getElementById('btn-new-group').addEventListener('click', () => openModal('modal-group'));
 
   const playerNameInput = document.getElementById('player-name');

@@ -448,12 +448,49 @@ final class Application
             )
             : $this->defaultGroup($userId);
         $groupId = (int) $group['id'];
+        $playerNames = array_key_exists('playerNames', $body)
+            ? $this->playerNames($body, 'playerNames')
+            : [];
+        $initialBuyin = array_key_exists('initialBuyin', $body)
+            ? $this->number($body, 'initialBuyin', '统一带入金额')
+            : 0.0;
+        if ($initialBuyin < 0) {
+            throw new HttpException(400, '统一带入金额不能小于0');
+        }
 
-        $statement = $this->pdo->prepare(
-            'INSERT INTO sessions (user_id, name, group_id, rake_rate) VALUES (?, ?, ?, ?)'
-        );
-        $statement->execute([$userId, $name, $groupId, $rakeRate]);
-        $sessionId = (int) $this->pdo->lastInsertId();
+        $sessionId = 0;
+        $this->transaction(function () use (
+            $userId,
+            $name,
+            $groupId,
+            $rakeRate,
+            $playerNames,
+            $initialBuyin,
+            &$sessionId
+        ): void {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO sessions (user_id, name, group_id, rake_rate) VALUES (?, ?, ?, ?)'
+            );
+            $statement->execute([$userId, $name, $groupId, $rakeRate]);
+            $sessionId = (int) $this->pdo->lastInsertId();
+
+            if (count($playerNames) === 0) {
+                return;
+            }
+
+            $playerStatement = $this->pdo->prepare(
+                'INSERT INTO players (session_id, name, initial_buyin, total_buyin) VALUES (?, ?, ?, ?)'
+            );
+            $buyinStatement = $this->pdo->prepare(
+                'INSERT INTO buyins (player_id, amount) VALUES (?, ?)'
+            );
+            foreach ($playerNames as $playerName) {
+                $playerStatement->execute([$sessionId, $playerName, $initialBuyin, $initialBuyin]);
+                if ($initialBuyin > 0) {
+                    $buyinStatement->execute([(int) $this->pdo->lastInsertId(), $initialBuyin]);
+                }
+            }
+        });
         $this->json([
             'success' => true,
             'sessionId' => $sessionId,
@@ -462,6 +499,8 @@ final class Application
             'groupId' => $groupId,
             'groupName' => (string) $group['name'],
             'accessLevel' => (string) ($group['access_level'] ?? 'owner'),
+            'playerCount' => count($playerNames),
+            'initialBuyin' => $initialBuyin,
         ]);
     }
 
@@ -502,8 +541,7 @@ final class Application
              LEFT JOIN group_shares gs ON gs.group_id = g.id AND gs.shared_user_id = ?
              WHERE (g.user_id = ? OR gs.id IS NOT NULL) AND TRIM(p.name) <> \'\'
              GROUP BY p.name COLLATE NOCASE
-             ORDER BY MAX(p.id) DESC
-             LIMIT 50'
+             ORDER BY MAX(p.id) DESC'
         );
         $statement->execute([$userId, $userId]);
         $names = [];
@@ -531,6 +569,15 @@ final class Application
         }
 
         $session = $this->castSession($session);
+        $stats = $this->calculateSessionStats(
+            $sessionId,
+            (float) $session['rake_rate'],
+            $session['final_rake']
+        );
+        $session['calculated_rake'] = $stats['calculatedRake'];
+        $session['effective_rake'] = $stats['totalRake'];
+        $session['is_fully_settled'] = $stats['isFullySettled'];
+        $session['rake_overridden'] = $stats['isRakeOverridden'];
         $session['players'] = $players;
         $this->json($session);
     }
@@ -545,6 +592,23 @@ final class Application
         if (array_key_exists('rakeRate', $body)) {
             $updates[] = 'rake_rate = ?';
             $params[] = $this->rakeRate($body, 'rakeRate');
+            if (!array_key_exists('finalRake', $body)) {
+                $updates[] = 'final_rake = NULL';
+            }
+        }
+
+        if (array_key_exists('finalRake', $body)) {
+            $completion = $this->calculateSessionStats(
+                $sessionId,
+                (float) $sessionAccess['rake_rate'],
+                null
+            );
+            if (!$completion['isFullySettled']) {
+                throw new HttpException(400, '全部玩家结算后才能设置最终抽水');
+            }
+            $finalRake = $this->nonNegativeInteger($body, 'finalRake', '最终抽水');
+            $updates[] = 'final_rake = ?';
+            $params[] = $finalRake;
         }
 
         if (array_key_exists('groupId', $body)) {
@@ -571,6 +635,7 @@ final class Application
         $this->json([
             'success' => true,
             'rakeRate' => $session['rake_rate'],
+            'finalRake' => $session['final_rake'],
             'groupId' => $session['group_id'],
             'groupName' => $session['group_name'],
         ]);
@@ -611,6 +676,7 @@ final class Application
 
         $playerId = 0;
         $this->transaction(function () use ($sessionId, $name, $initialBuyin, &$playerId): void {
+            $this->clearFinalRake($sessionId);
             $statement = $this->pdo->prepare(
                 'INSERT INTO players (session_id, name, initial_buyin, total_buyin) VALUES (?, ?, ?, ?)'
             );
@@ -628,8 +694,10 @@ final class Application
 
     private function deletePlayer(int $playerId, int $userId): void
     {
-        $this->accessiblePlayer($playerId, $userId, 'input');
-        $this->transaction(function () use ($playerId): void {
+        $player = $this->accessiblePlayer($playerId, $userId, 'input');
+        $sessionId = (int) $player['session_id'];
+        $this->transaction(function () use ($playerId, $sessionId): void {
+            $this->clearFinalRake($sessionId);
             $statement = $this->pdo->prepare('DELETE FROM buyins WHERE player_id = ?');
             $statement->execute([$playerId]);
             $statement = $this->pdo->prepare('DELETE FROM players WHERE id = ?');
@@ -640,14 +708,16 @@ final class Application
 
     private function addBuyin(int $playerId, int $userId): void
     {
-        $this->accessiblePlayer($playerId, $userId, 'input');
+        $player = $this->accessiblePlayer($playerId, $userId, 'input');
+        $sessionId = (int) $player['session_id'];
         $body = $this->requestBody();
         $amount = $this->number($body, 'amount', '买入金额');
         if ($amount <= 0) {
             throw new HttpException(400, '买入金额必须大于0');
         }
 
-        $this->transaction(function () use ($playerId, $amount): void {
+        $this->transaction(function () use ($playerId, $amount, $sessionId): void {
+            $this->clearFinalRake($sessionId);
             $statement = $this->pdo->prepare('INSERT INTO buyins (player_id, amount) VALUES (?, ?)');
             $statement->execute([$playerId, $amount]);
             $statement = $this->pdo->prepare('UPDATE players SET total_buyin = total_buyin + ? WHERE id = ?');
@@ -688,8 +758,12 @@ final class Application
             throw new HttpException(400, '请提供结余金额或输赢金额');
         }
 
-        $statement = $this->pdo->prepare('UPDATE players SET final_balance = ? WHERE id = ?');
-        $statement->execute([$finalBalance, $playerId]);
+        $sessionId = (int) $player['session_id'];
+        $this->transaction(function () use ($finalBalance, $playerId, $sessionId): void {
+            $this->clearFinalRake($sessionId);
+            $statement = $this->pdo->prepare('UPDATE players SET final_balance = ? WHERE id = ?');
+            $statement->execute([$finalBalance, $playerId]);
+        });
         $this->json(['success' => true]);
     }
 
@@ -717,7 +791,11 @@ final class Application
 
         foreach ($statement->fetchAll() as $sessionRow) {
             $sessionId = (int) $sessionRow['id'];
-            $stats = $this->calculateSessionStats($sessionId, (float) $sessionRow['rake_rate']);
+            $stats = $this->calculateSessionStats(
+                $sessionId,
+                (float) $sessionRow['rake_rate'],
+                $sessionRow['final_rake'] === null ? null : (float) $sessionRow['final_rake']
+            );
             $totalBuyins += $stats['totalBuyins'];
             $totalSettled += $stats['totalSettled'];
             $totalRake += $stats['totalRake'];
@@ -735,6 +813,9 @@ final class Application
                 'totalBuyins' => $stats['totalBuyins'],
                 'totalSettled' => $stats['totalSettled'],
                 'totalRake' => $stats['totalRake'],
+                'calculatedRake' => $stats['calculatedRake'],
+                'finalRake' => $stats['finalRake'],
+                'isRakeOverridden' => $stats['isRakeOverridden'],
                 'totalNetSettled' => $stats['totalNetSettled'],
                 'error' => $stats['error'],
                 'isFullySettled' => $stats['isFullySettled'],
@@ -886,12 +967,16 @@ final class Application
     private function sessionStats(int $sessionId, int $userId): void
     {
         $session = $this->accessibleSession($sessionId, $userId, 'view');
-        $stats = $this->calculateSessionStats($sessionId, (float) $session['rake_rate']);
+        $stats = $this->calculateSessionStats(
+            $sessionId,
+            (float) $session['rake_rate'],
+            $session['final_rake'] === null ? null : (float) $session['final_rake']
+        );
         $stats['rakeRate'] = (float) $session['rake_rate'];
         $this->json($stats);
     }
 
-    private function calculateSessionStats(int $sessionId, float $rakeRate): array
+    private function calculateSessionStats(int $sessionId, float $rakeRate, ?float $finalRake = null): array
     {
         $statement = $this->pdo->prepare(
             'SELECT p.*,
@@ -905,7 +990,7 @@ final class Application
         $players = [];
         $totalBuyins = 0.0;
         $totalSettled = 0.0;
-        $totalRake = 0.0;
+        $calculatedRake = 0.0;
         $settledCount = 0;
         $rows = $statement->fetchAll();
         foreach ($rows as $row) {
@@ -923,7 +1008,7 @@ final class Application
                 $settledCount++;
             }
             if ($rake !== null) {
-                $totalRake += $rake;
+                $calculatedRake += $rake;
             }
             $players[] = [
                 'id' => (int) $row['id'],
@@ -939,6 +1024,8 @@ final class Application
 
         $playerCount = count($rows);
         $isFullySettled = $playerCount > 0 && $settledCount === $playerCount;
+        $isRakeOverridden = $isFullySettled && $finalRake !== null;
+        $totalRake = $isRakeOverridden ? $finalRake : $calculatedRake;
         $error = round($totalBuyins - $totalSettled, 2);
         $waterPoolAdjustment = $isFullySettled ? $error : 0.0;
         $waterPool = round($totalRake + $waterPoolAdjustment, 2);
@@ -950,12 +1037,21 @@ final class Application
             'isFullySettled' => $isFullySettled,
             'totalBuyins' => round($totalBuyins, 2),
             'totalSettled' => round($totalSettled, 2),
+            'calculatedRake' => round($calculatedRake, 2),
+            'finalRake' => $finalRake === null ? null : round($finalRake, 2),
+            'isRakeOverridden' => $isRakeOverridden,
             'totalRake' => round($totalRake, 2),
             'totalNetSettled' => round($totalSettled - $totalRake, 2),
             'error' => $error,
             'waterPoolAdjustment' => $waterPoolAdjustment,
             'waterPool' => $waterPool,
         ];
+    }
+
+    private function clearFinalRake(int $sessionId): void
+    {
+        $statement = $this->pdo->prepare('UPDATE sessions SET final_rake = NULL WHERE id = ?');
+        $statement->execute([$sessionId]);
     }
 
     private function requireUser(): int
@@ -1157,6 +1253,32 @@ final class Application
         return $body[$key];
     }
 
+    private function playerNames(array $body, string $key): array
+    {
+        if (!is_array($body[$key])) {
+            throw new HttpException(400, '玩家列表必须是数组');
+        }
+
+        $names = [];
+        $seen = [];
+        foreach ($body[$key] as $value) {
+            if (!is_string($value) || trim($value) === '') {
+                throw new HttpException(400, '玩家姓名不能为空');
+            }
+            $name = trim($value);
+            if (strlen($name) > 100) {
+                throw new HttpException(400, '玩家姓名不能超过100个字符');
+            }
+            $normalized = strtolower($name);
+            if (isset($seen[$normalized])) {
+                throw new HttpException(400, '玩家列表中不能有重复姓名');
+            }
+            $seen[$normalized] = true;
+            $names[] = $name;
+        }
+        return $names;
+    }
+
     private function number(array $body, string $key, string $label): float
     {
         if (!array_key_exists($key, $body) || is_bool($body[$key]) || !is_numeric($body[$key])) {
@@ -1177,6 +1299,18 @@ final class Application
         $value = (int) $body[$key];
         if ((float) $body[$key] !== (float) $value || $value <= 0) {
             throw new HttpException(400, $label . '必须是有效整数');
+        }
+        return $value;
+    }
+
+    private function nonNegativeInteger(array $body, string $key, string $label): int
+    {
+        if (!array_key_exists($key, $body) || is_bool($body[$key]) || !is_numeric($body[$key])) {
+            throw new HttpException(400, $label . '必须是有效整数');
+        }
+        $value = (int) $body[$key];
+        if ((float) $body[$key] !== (float) $value || $value < 0) {
+            throw new HttpException(400, $label . '必须是大于等于0的整数');
         }
         return $value;
     }
@@ -1205,6 +1339,7 @@ final class Application
         $row['user_id'] = (int) $row['user_id'];
         $row['group_id'] = $row['group_id'] === null ? null : (int) $row['group_id'];
         $row['rake_rate'] = (float) $row['rake_rate'];
+        $row['final_rake'] = $row['final_rake'] === null ? null : (float) $row['final_rake'];
         if (array_key_exists('group_is_default', $row)) {
             $row['group_is_default'] = (bool) $row['group_is_default'];
         }

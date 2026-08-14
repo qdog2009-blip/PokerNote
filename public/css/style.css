@@ -199,6 +199,292 @@ select:focus {
   width: 100%;
 }
 
+.session-create-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+
+.create-session-hero {
+  position: relative;
+  min-height: 132px;
+  margin-bottom: 12px;
+  padding: 22px 116px 22px 22px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 15%, rgba(74, 108, 247, 0.52), transparent 36%),
+    linear-gradient(135deg, #15213b, #263c6b);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(21, 33, 59, 0.18);
+}
+
+.create-session-kicker {
+  color: #9db4ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+}
+
+.create-session-hero h3 {
+  margin: 7px 0 6px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.create-session-hero p {
+  max-width: 400px;
+  color: #c9d4f4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.create-session-mark {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  width: 74px;
+  height: 94px;
+  display: grid;
+  place-items: center;
+  color: #15213b;
+  background: linear-gradient(145deg, #fff, #e8edff);
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 12px;
+  font-size: 39px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+  transform: rotate(7deg);
+}
+
+.create-session-card {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(31, 41, 55, 0.05);
+}
+
+.create-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.create-card-heading > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  color: #fff;
+  background: #1f3157;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.create-card-heading h3 {
+  margin: 0 0 2px;
+  color: #253352;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.create-card-heading p {
+  color: var(--text-light);
+  font-size: 11px;
+}
+
+.create-card-heading p strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.create-session-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.create-field {
+  min-width: 0;
+}
+
+.create-field-wide {
+  grid-column: 1 / -1;
+}
+
+.create-field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #657087;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.create-field input,
+.create-field select {
+  padding: 10px 11px;
+  font-size: 14px;
+}
+
+.create-number-input {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.create-number-input:focus-within {
+  border-color: var(--primary);
+}
+
+.create-number-input input {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.create-number-input b {
+  padding-right: 11px;
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.create-number-input.money b {
+  padding: 0 0 0 11px;
+}
+
+.player-pick-heading {
+  align-items: flex-start;
+}
+
+.player-pick-heading > div:nth-child(2) {
+  flex: 1;
+}
+
+.player-pick-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.player-pick-actions .btn {
+  padding: 6px 9px;
+  color: #51617e;
+  font-size: 11px;
+}
+
+.create-player-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.create-player-option {
+  min-width: 0;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #45516a;
+  background: #f7f8fb;
+  border: 1px solid #e4e8f0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.create-player-option:hover {
+  border-color: #b8c5ea;
+  transform: translateY(-1px);
+}
+
+.create-player-option.selected {
+  color: #203c8d;
+  background: #eef2ff;
+  border-color: #8fa7f4;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.create-player-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.create-player-check {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  color: transparent;
+  background: #fff;
+  border: 1px solid #cbd2df;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.create-player-option.selected .create-player-check {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.create-player-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-player-empty {
+  grid-column: 1 / -1;
+  padding: 26px 14px;
+  color: var(--text-light);
+  background: #fafbfc;
+  border: 1px dashed #ccd3df;
+  border-radius: 9px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.create-session-submit {
+  position: sticky;
+  bottom: 10px;
+  z-index: 20;
+  margin-top: 14px;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(213, 218, 229, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(28, 39, 65, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.create-session-submit .btn {
+  width: 100%;
+}
+
+.create-session-submit .btn.primary {
+  font-weight: 700;
+}
+
 .btn.group-create-btn {
   color: var(--group);
   background: var(--group-soft);
@@ -574,6 +860,127 @@ select:focus {
   color: #fff;
   background: var(--rake);
   border-color: var(--rake);
+}
+
+.final-rake-setting {
+  margin-top: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: linear-gradient(135deg, #effcf6, #f7fffb);
+  border: 1px solid #9fd8ba;
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 #16845b;
+}
+
+.final-rake-copy {
+  min-width: 0;
+}
+
+.final-rake-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.final-rake-heading > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.final-rake-heading span:not(.final-rake-icon) {
+  color: #568673;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.final-rake-heading strong {
+  color: #145a40;
+  font-size: 14px;
+}
+
+.final-rake-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  color: #fff;
+  background: #16845b;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px rgba(22, 132, 91, 0.1);
+}
+
+.final-rake-copy p {
+  margin: 4px 0 0 37px;
+  color: #5f7e70;
+  font-size: 11px;
+}
+
+.final-rake-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.money-input {
+  width: 104px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #8ccbae;
+  border-radius: 8px;
+}
+
+.money-input:focus-within {
+  border-color: #16845b;
+  box-shadow: 0 0 0 2px rgba(22, 132, 91, 0.1);
+}
+
+.money-input span {
+  padding-left: 9px;
+  color: #16845b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.money-input input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 9px 8px 4px;
+  border: 0;
+  border-radius: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.money-input input:focus {
+  border-color: transparent;
+}
+
+.money-input input:disabled {
+  color: #315e4b;
+  background: #f4fbf7;
+  opacity: 1;
+}
+
+.btn.final-rake-save {
+  padding: 8px 11px;
+  color: #126443;
+  background: #fff;
+  border-color: #8ccbae;
+}
+
+.btn.final-rake-save:hover {
+  color: #fff;
+  background: #16845b;
+  border-color: #16845b;
 }
 
 .input-row {
@@ -1137,6 +1544,52 @@ select:focus {
   .container {
     padding: 8px 10px;
   }
+
+  .create-session-hero {
+    min-height: 124px;
+    padding: 18px 94px 18px 18px;
+  }
+
+  .create-session-hero h3 {
+    font-size: 19px;
+  }
+
+  .create-session-mark {
+    right: 17px;
+    width: 60px;
+    height: 78px;
+    font-size: 32px;
+  }
+
+  .create-session-card {
+    padding: 13px;
+  }
+
+  .create-session-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .create-field-wide {
+    grid-column: auto;
+  }
+
+  .create-player-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .player-pick-heading {
+    flex-wrap: wrap;
+  }
+
+  .player-pick-actions {
+    width: 100%;
+    padding-left: 40px;
+  }
+
+  .player-pick-actions .btn {
+    flex: 1;
+  }
   
   .card {
     padding: 14px;
@@ -1204,6 +1657,20 @@ select:focus {
 
   .rake-controls .percent-input {
     flex: 1;
+  }
+
+  .final-rake-setting {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .final-rake-controls {
+    width: 100%;
+  }
+
+  .final-rake-controls .money-input {
+    flex: 1;
+    width: auto;
   }
 
   .group-setting {

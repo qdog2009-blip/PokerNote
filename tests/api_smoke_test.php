@@ -187,6 +187,76 @@ try {
     assertTrue($authenticatedCookie !== $token, 'Login reused the registration token');
     $groupId = (int) $groups['body'][0]['id'];
 
+    $batchPlayerNames = [];
+    for ($playerNumber = 1; $playerNumber <= 55; $playerNumber++) {
+        $batchPlayerNames[] = '历史玩家' . str_pad((string) $playerNumber, 2, '0', STR_PAD_LEFT);
+    }
+    $batchSession = request(
+        'POST',
+        $baseUrl . '/api/sessions',
+        [
+            'name' => '批量创建测试',
+            'rakeRate' => 6.5,
+            'groupId' => $groupId,
+            'initialBuyin' => 88.5,
+            'playerNames' => $batchPlayerNames,
+        ],
+        $authenticatedCookie
+    );
+    assertTrue($batchSession['status'] === 200, 'Unable to create a session with selected historical players');
+    assertTrue((int) ($batchSession['body']['playerCount'] ?? -1) === 55, 'Batch session response has the wrong player count');
+    assertTrue((float) ($batchSession['body']['initialBuyin'] ?? -1) === 88.5, 'Batch session response has the wrong buy-in');
+    $batchSessionId = (int) ($batchSession['body']['sessionId'] ?? 0);
+
+    $batchSessionDetail = request(
+        'GET',
+        $baseUrl . '/api/sessions/' . $batchSessionId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($batchSessionDetail['status'] === 200, 'Unable to load the batch-created session');
+    $batchPlayers = $batchSessionDetail['body']['players'] ?? [];
+    assertTrue(count($batchPlayers) === 55, 'The batch-created session does not contain every selected player');
+    foreach ($batchPlayers as $batchPlayer) {
+        assertTrue((float) ($batchPlayer['initial_buyin'] ?? -1) === 88.5, 'A selected player has the wrong initial buy-in');
+        assertTrue((float) ($batchPlayer['total_buyin'] ?? -1) === 88.5, 'A selected player has the wrong total buy-in');
+        assertTrue((float) ($batchPlayer['total_buyin_recorded'] ?? -1) === 88.5, 'A selected player is missing the initial buy-in record');
+    }
+
+    $allPlayerNames = request('GET', $baseUrl . '/api/player-names', null, $authenticatedCookie);
+    assertTrue($allPlayerNames['status'] === 200, 'Unable to load all historical player names');
+    assertTrue(count($allPlayerNames['body']) === 55, 'Historical player names are still limited to 50 entries');
+    assertTrue(in_array('历史玩家01', $allPlayerNames['body'], true), 'The oldest batch player is missing from history');
+    assertTrue(in_array('历史玩家55', $allPlayerNames['body'], true), 'The newest batch player is missing from history');
+
+    $sessionsBeforeDuplicate = request('GET', $baseUrl . '/api/sessions', null, $authenticatedCookie);
+    $duplicateBatchSession = request(
+        'POST',
+        $baseUrl . '/api/sessions',
+        [
+            'name' => '不应留下的重复玩家场次',
+            'rakeRate' => 6.5,
+            'groupId' => $groupId,
+            'initialBuyin' => 88.5,
+            'playerNames' => ['重复玩家', '重复玩家'],
+        ],
+        $authenticatedCookie
+    );
+    assertTrue($duplicateBatchSession['status'] === 400, 'A session with duplicate selected players was accepted');
+    $sessionsAfterDuplicate = request('GET', $baseUrl . '/api/sessions', null, $authenticatedCookie);
+    assertTrue(
+        count($sessionsAfterDuplicate['body']) === count($sessionsBeforeDuplicate['body']),
+        'A failed batch request left a partial session behind'
+    );
+
+    $batchSessionDelete = request(
+        'DELETE',
+        $baseUrl . '/api/sessions/' . $batchSessionId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($batchSessionDelete['status'] === 200, 'Unable to remove the batch-created test session');
+
     $defaultGroupDelete = request('DELETE', $baseUrl . '/api/groups/' . $groupId, null, $authenticatedCookie);
     assertTrue($defaultGroupDelete['status'] === 400, 'The default group was deleted');
 
@@ -292,6 +362,13 @@ try {
     assertTrue(($partialStats['body']['isFullySettled'] ?? true) === false, 'A partial settlement was marked complete');
     assertTrue((float) ($partialStats['body']['waterPoolAdjustment'] ?? -1) === 0.0, 'A partial error was applied to the water pool');
     assertTrue((float) ($partialStats['body']['waterPool'] ?? -1) === 5.0, 'Partial water pool should contain only winner rake');
+    $prematureFinalRake = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalRake' => 8],
+        $authenticatedCookie
+    );
+    assertTrue($prematureFinalRake['status'] === 400, 'Final rake was accepted before every player settled');
 
     $positiveErrorSettlement = request(
         'POST',
@@ -303,9 +380,39 @@ try {
 
     $positiveStats = request('GET', $baseUrl . '/api/sessions/' . $sessionId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($positiveStats['body']['totalRake'] ?? -1) === 5.0, 'Winner rake is incorrect');
+    assertTrue((float) ($positiveStats['body']['calculatedRake'] ?? -1) === 5.0, 'Calculated rake is incorrect');
+    assertTrue(($positiveStats['body']['finalRake'] ?? null) === null, 'A new settlement unexpectedly has a final rake override');
     assertTrue((float) ($positiveStats['body']['error'] ?? -1) === 10.0, 'Positive settlement error is incorrect');
     assertTrue((float) ($positiveStats['body']['waterPoolAdjustment'] ?? -1) === 10.0, 'Positive error was not added to the water pool');
     assertTrue((float) ($positiveStats['body']['waterPool'] ?? -1) === 15.0, 'Positive-error water pool is incorrect');
+
+    $manualFinalRake = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalRake' => 8],
+        $authenticatedCookie
+    );
+    assertTrue($manualFinalRake['status'] === 200, 'Unable to save the final rake');
+    assertTrue((float) ($manualFinalRake['body']['finalRake'] ?? -1) === 8.0, 'The final rake was not persisted');
+    $manualStats = request('GET', $baseUrl . '/api/sessions/' . $sessionId . '/stats', null, $authenticatedCookie);
+    assertTrue((float) ($manualStats['body']['calculatedRake'] ?? -1) === 5.0, 'Manual rake changed the calculated rake');
+    assertTrue((float) ($manualStats['body']['totalRake'] ?? -1) === 8.0, 'Session stats ignored the manual final rake');
+    assertTrue(($manualStats['body']['isRakeOverridden'] ?? false) === true, 'Manual final rake is not marked as active');
+    assertTrue((float) ($manualStats['body']['waterPool'] ?? -1) === 18.0, 'Water pool ignored the manual final rake');
+    assertTrue((float) ($manualStats['body']['totalNetSettled'] ?? -1) === 182.0, 'Net settlement ignored the manual final rake');
+
+    $sessionWithFinalRake = request('GET', $baseUrl . '/api/sessions/' . $sessionId, null, $authenticatedCookie);
+    assertTrue((float) ($sessionWithFinalRake['body']['calculated_rake'] ?? -1) === 5.0, 'Session detail omits calculated rake');
+    assertTrue((float) ($sessionWithFinalRake['body']['effective_rake'] ?? -1) === 8.0, 'Session detail omits effective rake');
+    assertTrue(($sessionWithFinalRake['body']['is_fully_settled'] ?? false) === true, 'Session detail is missing completion state');
+
+    $decimalFinalRake = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalRake' => 7.5],
+        $authenticatedCookie
+    );
+    assertTrue($decimalFinalRake['status'] === 400, 'A decimal final rake was accepted');
 
     $negativeErrorSettlement = request(
         'POST',
@@ -316,15 +423,26 @@ try {
     assertTrue($negativeErrorSettlement['status'] === 200, 'Unable to update the losing player settlement');
 
     $negativeStats = request('GET', $baseUrl . '/api/sessions/' . $sessionId . '/stats', null, $authenticatedCookie);
+    assertTrue(($negativeStats['body']['finalRake'] ?? null) === null, 'Changing settlement did not clear the old final rake');
+    assertTrue((float) ($negativeStats['body']['totalRake'] ?? -1) === 5.0, 'Calculated rake was not restored after settlement changed');
     assertTrue((float) ($negativeStats['body']['error'] ?? 1) === -10.0, 'Negative settlement error is incorrect');
     assertTrue((float) ($negativeStats['body']['waterPoolAdjustment'] ?? 1) === -10.0, 'Negative error was not deducted from the water pool');
     assertTrue((float) ($negativeStats['body']['waterPool'] ?? 1) === -5.0, 'Negative-error water pool is incorrect');
 
+    $updatedFinalRake = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalRake' => 7],
+        $authenticatedCookie
+    );
+    assertTrue($updatedFinalRake['status'] === 200, 'Unable to save the updated final rake');
+
     $groupStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
+    assertTrue((float) ($groupStats['body']['totalRake'] ?? -1) === 7.0, 'Group stats ignored the manual final rake');
     assertTrue((float) ($groupStats['body']['waterPoolAdjustment'] ?? 1) === -10.0, 'Group water-pool adjustment is incorrect');
-    assertTrue((float) ($groupStats['body']['grossWaterPool'] ?? 1) === -5.0, 'Gross group water pool is incorrect');
+    assertTrue((float) ($groupStats['body']['grossWaterPool'] ?? 1) === -3.0, 'Gross group water pool is incorrect');
     assertTrue((float) ($groupStats['body']['totalPoolExpenses'] ?? 1) === 0.0, 'A new group unexpectedly has expenses');
-    assertTrue((float) ($groupStats['body']['waterPool'] ?? 1) === -5.0, 'Group water pool is incorrect');
+    assertTrue((float) ($groupStats['body']['waterPool'] ?? 1) === -3.0, 'Group water pool is incorrect');
 
     $expense = request(
         'POST',
@@ -338,9 +456,9 @@ try {
     assertTrue(($expense['body']['expense']['note'] ?? null) === '场地费', 'Pool expense note was not saved');
 
     $statsWithExpense = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
-    assertTrue((float) ($statsWithExpense['body']['grossWaterPool'] ?? 1) === -5.0, 'An expense changed the gross water pool');
+    assertTrue((float) ($statsWithExpense['body']['grossWaterPool'] ?? 1) === -3.0, 'An expense changed the gross water pool');
     assertTrue((float) ($statsWithExpense['body']['totalPoolExpenses'] ?? 0) === 3.25, 'Group expense total is incorrect');
-    assertTrue((float) ($statsWithExpense['body']['waterPool'] ?? 1) === -8.25, 'Pool expense was not deducted from the balance');
+    assertTrue((float) ($statsWithExpense['body']['waterPool'] ?? 1) === -6.25, 'Pool expense was not deducted from the balance');
     assertTrue(($statsWithExpense['body']['expenses'][0]['note'] ?? null) === '场地费', 'Pool expense is missing from group stats');
 
     $otherCredentials = [

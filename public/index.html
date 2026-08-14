@@ -75,6 +75,80 @@
         <div id="sessions-list" class="grouped-session-list"></div>
       </div>
     </div>
+
+    <!-- 创建场次页 -->
+    <div id="page-session-create" class="page">
+      <header>
+        <button class="btn back" onclick="goBack()">← 返回</button>
+        <h2>创建新场次</h2>
+      </header>
+      <div class="container session-create-page">
+        <section class="create-session-hero">
+          <div>
+            <span class="create-session-kicker">NEW TABLE</span>
+            <h3>开一场新牌局</h3>
+            <p>一次选好分组、玩家和统一带入，保存后统一入场。</p>
+          </div>
+          <div class="create-session-mark" aria-hidden="true">♠</div>
+        </section>
+
+        <section class="create-session-card">
+          <div class="create-card-heading">
+            <span>01</span>
+            <div>
+              <h3>场次信息</h3>
+              <p>标题默认使用今天的日期</p>
+            </div>
+          </div>
+          <div class="create-session-fields">
+            <label class="create-field create-field-wide" for="session-name">
+              <span>场次标题</span>
+              <input type="text" id="session-name" maxlength="100" autocomplete="off" placeholder="场次标题">
+            </label>
+            <label class="create-field" for="session-create-group">
+              <span>所属分组</span>
+              <select id="session-create-group"></select>
+            </label>
+            <label class="create-field" for="session-create-rake-rate">
+              <span>抽水比例</span>
+              <div class="create-number-input">
+                <input type="number" id="session-create-rake-rate" min="0" max="100" step="0.01" inputmode="decimal" value="0">
+                <b>%</b>
+              </div>
+            </label>
+            <label class="create-field" for="session-create-buyin">
+              <span>统一带入金额</span>
+              <div class="create-number-input money">
+                <b>¥</b>
+                <input type="number" id="session-create-buyin" min="0" step="0.01" inputmode="decimal" placeholder="0">
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <section class="create-session-card player-pick-card">
+          <div class="create-card-heading player-pick-heading">
+            <span>02</span>
+            <div>
+              <h3>选择历史玩家</h3>
+              <p><strong id="session-create-player-count">已选 0 人</strong> · 所选玩家使用相同带入金额</p>
+            </div>
+            <div class="player-pick-actions">
+              <button type="button" class="btn" onclick="selectAllCreatePlayers()">全选</button>
+              <button type="button" class="btn" onclick="clearCreatePlayers()">清空</button>
+            </div>
+          </div>
+          <div id="session-create-player-list" class="create-player-grid"></div>
+        </section>
+
+        <div class="create-session-submit">
+          <button type="button" class="btn" onclick="goBack()">取消</button>
+          <button type="button" class="btn primary" id="session-create-submit" onclick="createSession()">
+            保存并创建
+          </button>
+        </div>
+      </div>
+    </div>
     
     <!-- 场次详情页 -->
     <div id="page-session" class="page">
@@ -113,6 +187,26 @@
               <span>%</span>
             </label>
             <button class="btn rake-save" onclick="saveRakeRate()">保存</button>
+          </div>
+        </div>
+
+        <div class="final-rake-setting" id="session-final-rake-setting" hidden>
+          <div class="final-rake-copy">
+            <div class="final-rake-heading">
+              <span class="final-rake-icon" aria-hidden="true">✓</span>
+              <div>
+                <span>全部玩家已结算</span>
+                <strong>最终抽水</strong>
+              </div>
+            </div>
+            <p id="session-final-rake-note">系统计算 ¥0，保存后统计和水池以输入金额为准</p>
+          </div>
+          <div class="final-rake-controls">
+            <label class="money-input" aria-label="本场最终抽水金额">
+              <span>¥</span>
+              <input type="number" id="session-final-rake" min="0" step="1" inputmode="numeric" value="0">
+            </label>
+            <button class="btn final-rake-save" id="session-final-rake-save" onclick="saveFinalRake()">保存</button>
           </div>
         </div>
 
@@ -230,7 +324,7 @@
             <span id="stat-rake-rate">0%</span>
           </div>
           <div class="summary-row rake-summary">
-            <span>盈利玩家抽水</span>
+            <span id="stat-total-rake-label">盈利玩家抽水</span>
             <span id="stat-total-rake">0</span>
           </div>
           <div class="summary-row pool-adjustment" id="stat-error-row">
@@ -275,7 +369,7 @@
             <span id="group-stat-total-settled">0</span>
           </div>
           <div class="summary-row rake-summary">
-            <span>盈利玩家抽水</span>
+            <span>最终抽水合计</span>
             <span id="group-stat-total-rake">0</span>
           </div>
           <div class="summary-row pool-adjustment" id="group-stat-error-row">
@@ -320,31 +414,6 @@
     </div>
   </div>
   
-  <!-- 创建场次弹窗 -->
-  <div id="modal-session" class="modal">
-    <div class="modal-content">
-      <h3>创建新场次</h3>
-      <input type="text" id="session-name" placeholder="场次名称 (如: 2024年1月周五局)">
-      <div class="modal-field">
-        <label for="session-create-group">所属分组</label>
-        <select id="session-create-group"></select>
-        <small class="group-help">不选择时使用默认分组</small>
-      </div>
-      <div class="modal-field">
-        <label for="session-create-rake-rate">抽水比例</label>
-        <div class="percent-input create-rake-input">
-          <input type="number" id="session-create-rake-rate" min="0" max="100" step="0.01" inputmode="decimal" value="0">
-          <span>%</span>
-        </div>
-        <small>只对最终盈利玩家的盈利部分抽水</small>
-      </div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal('modal-session')">取消</button>
-        <button class="btn primary" onclick="createSession()">创建</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 创建分组弹窗 -->
   <div id="modal-group" class="modal">
     <div class="modal-content">
@@ -422,6 +491,6 @@
 
   <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
   
-  <script src="js/app.js?v=20260814-token-auth"></script>
+  <script src="js/app.js?v=20260814-session-create"></script>
 </body>
 </html>

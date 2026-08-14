@@ -57,7 +57,7 @@ try {
 
     $migrated = Database::connect($databasePath);
     $session = $migrated->query(
-        'SELECT s.rake_rate, s.group_id, g.name, g.is_default
+        'SELECT s.rake_rate, s.final_rake, s.group_id, g.name, g.is_default
          FROM sessions s
          JOIN session_groups g ON g.id = s.group_id
          WHERE s.id = 1'
@@ -68,6 +68,9 @@ try {
     }
     if ((float) $session['rake_rate'] !== 0.0) {
         throw new RuntimeException('The legacy session did not receive a zero rake rate');
+    }
+    if ($session['final_rake'] !== null) {
+        throw new RuntimeException('The legacy session unexpectedly received a final rake override');
     }
     if ($session['name'] !== '默认分组' || (int) $session['is_default'] !== 1) {
         throw new RuntimeException('The legacy session was not assigned to the default group');

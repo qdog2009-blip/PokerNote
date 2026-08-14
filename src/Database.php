@@ -88,6 +88,7 @@ final class Database
                 name TEXT NOT NULL,
                 group_id INTEGER,
                 rake_rate REAL NOT NULL DEFAULT 0,
+                final_rake REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (group_id) REFERENCES session_groups(id)
@@ -106,6 +107,7 @@ final class Database
         );
 
         self::addColumnIfMissing($pdo, 'sessions', 'rake_rate', 'REAL NOT NULL DEFAULT 0');
+        self::addColumnIfMissing($pdo, 'sessions', 'final_rake', 'REAL');
         self::addColumnIfMissing($pdo, 'sessions', 'group_id', 'INTEGER');
         self::ensureDefaultGroups($pdo);
 
