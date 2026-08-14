@@ -9,36 +9,6 @@
 
 </div>
 
-## 📱 界面预览
-
-> 以下是移动端界面截图（375x667 iPhone SE 尺寸）
-
-| 登录/注册 | 场次列表 |
-|:---:|:---:|
-| ![登录](docs/images/login.png) | ![场次列表](docs/images/sessions.png) |
-
-| 添加玩家 | 买入操作 |
-|:---:|:---:|
-| ![添加玩家](docs/images/add-player.png) | ![买入](docs/images/buyin.png) |
-
-| 结算界面 | 统计结果 |
-|:---:|:---:|
-| ![结算](docs/images/settle.png) | ![统计](docs/images/stats.png) |
-
-### 截图目录
-
-```
-docs/images/
-├── login.png         # 登录/注册页面
-├── sessions.png      # 场次列表页面
-├── add-player.png    # 添加玩家页面
-├── buyin.png         # 买入弹窗页面
-├── settle.png        # 玩家结算页面
-└── stats.png         # 统计结果页面
-```
-
-> **提示**：如需更新截图，请访问 http://localhost:3000 进行操作，然后使用浏览器截取对应页面保存到 `docs/images/` 目录。
-
 ## ✨ 功能特性
 
 | 功能 | 说明 |
@@ -120,6 +90,31 @@ PHP 进程必须对项目根目录具有写权限，以便创建和更新 `toolb
 
 如需把数据库放到其他位置，可在启动 PHP 前设置 `POKERNOTE_DB_PATH` 为 SQLite 文件的绝对路径。
 
+### Nginx 反向代理
+
+项目提供了可直接修改的配置模板：`deploy/nginx/pokernote.conf`。先让 PHP 服务只监听本机地址：
+
+```bash
+php -S 127.0.0.1:3000 -t public router.php
+```
+
+Windows 使用 `start.cmd` 时可这样设置：
+
+```bat
+set POKERNOTE_BIND_ADDRESS=127.0.0.1
+start.cmd
+```
+
+复制配置并把其中的 `pokernote.example.com` 改成实际域名：
+
+```bash
+sudo cp deploy/nginx/pokernote.conf /etc/nginx/conf.d/pokernote.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+模板会代理全部页面、静态资源和 `/api/` 请求，并传递客户端 IP、域名及访问协议。若 HTTPS 由 Nginx 终止，应用会根据 `X-Forwarded-Proto` 自动为登录 Cookie 启用 `Secure`。证书可使用 Certbot 配置，完成后再次运行 `nginx -t` 并重载 Nginx。
+
 ## 📖 使用流程
 
 ```
@@ -182,19 +177,14 @@ PHP 进程必须对项目根目录具有写权限，以便创建和更新 `toolb
 ```
 PokerNote/
 ├── composer.json      # PHP 7.4 与扩展要求
+├── deploy/
+│   └── nginx/
+│       └── pokernote.conf  # Nginx 反向代理模板
 ├── router.php         # PHP 内置服务器路由
 ├── src/
 │   ├── Application.php  # API 路由与业务逻辑
 │   └── Database.php     # SQLite 连接与初始化
 ├── README.md          # 项目文档
-├── docs/
-│   └── images/        # 截图目录
-│       ├── login.png
-│       ├── sessions.png
-│       ├── add-player.png
-│       ├── buyin.png
-│       ├── settle.png
-│       └── stats.png
 ├── public/            # 静态资源
 │   ├── .htaccess      # Apache API 重写规则
 │   ├── index.html     # 主页面

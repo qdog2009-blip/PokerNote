@@ -17,9 +17,15 @@ function assertTrue(bool $condition, string $message): void
 /**
  * @return array{status: int, headers: string[], body: array<string, mixed>}
  */
-function request(string $method, string $url, ?array $body = null, ?string $cookie = null): array
+function request(
+    string $method,
+    string $url,
+    ?array $body = null,
+    ?string $cookie = null,
+    array $additionalHeaders = []
+): array
 {
-    $headers = ['Accept: application/json'];
+    $headers = array_merge(['Accept: application/json'], $additionalHeaders);
     $content = '';
     if ($body !== null) {
         $headers[] = 'Content-Type: application/json';
@@ -92,6 +98,20 @@ function hasExpiredSessionCookie(array $headers): bool
         if (
             stripos($header, 'Set-Cookie: pokernote_session=') === 0
             && preg_match('/Max-Age=0/i', $header) === 1
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function hasSecureSessionCookie(array $headers): bool
+{
+    foreach ($headers as $header) {
+        if (
+            stripos($header, 'Set-Cookie: pokernote_session=') === 0
+            && preg_match('/;\s*Secure(?:;|$)/i', $header) === 1
         ) {
             return true;
         }
@@ -187,6 +207,16 @@ try {
     $persistentSession = request('GET', $baseUrl . '/api/me', null, $cookie);
     assertTrue($persistentSession['status'] === 200, 'Persistent session cannot restore the signed-in user');
     assertTrue(hasPersistentSessionCookie($persistentSession['headers']), 'Authenticated activity did not renew the persistent cookie');
+
+    $proxiedHttpsSession = request(
+        'GET',
+        $baseUrl . '/api/me',
+        null,
+        $cookie,
+        ['X-Forwarded-Proto: https']
+    );
+    assertTrue($proxiedHttpsSession['status'] === 200, 'HTTPS proxy request cannot restore the signed-in user');
+    assertTrue(hasSecureSessionCookie($proxiedHttpsSession['headers']), 'HTTPS proxy session cookie is missing Secure');
 
     $logout = request('POST', $baseUrl . '/api/logout', null, $cookie);
     assertTrue($logout['status'] === 200 && ($logout['body']['success'] ?? false) === true, 'Logout failed');

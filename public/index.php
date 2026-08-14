@@ -10,7 +10,11 @@ header('X-Content-Type-Options: nosniff');
 
 ini_set('session.use_strict_mode', '1');
 $persistentSessionLifetime = 10 * 365 * 24 * 60 * 60;
-$secureSessionCookie = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+$forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+    ? strtolower(trim(explode(',', (string) $_SERVER['HTTP_X_FORWARDED_PROTO'])[0]))
+    : '';
+$secureSessionCookie = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || $forwardedProto === 'https';
 ini_set('session.gc_maxlifetime', (string) $persistentSessionLifetime);
 session_name('pokernote_session');
 session_set_cookie_params([
