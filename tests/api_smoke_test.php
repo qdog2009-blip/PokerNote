@@ -394,6 +394,13 @@ try {
         $authenticatedCookie
     );
     assertTrue($prematureFinalRake['status'] === 400, 'Final rake was accepted before every player settled');
+    $prematureFinalPool = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalPool' => 8],
+        $authenticatedCookie
+    );
+    assertTrue($prematureFinalPool['status'] === 400, 'Final pool was accepted before every player settled');
 
     $positiveErrorSettlement = request(
         'POST',
@@ -411,14 +418,15 @@ try {
     assertTrue((float) ($positiveStats['body']['waterPoolAdjustment'] ?? -1) === 10.0, 'Positive error was not added to the water pool');
     assertTrue((float) ($positiveStats['body']['waterPool'] ?? -1) === 15.0, 'Positive-error water pool is incorrect');
 
-    $manualFinalRake = request(
+    $manualFinalPool = request(
         'PATCH',
         $baseUrl . '/api/sessions/' . $sessionId,
-        ['finalRake' => 8],
+        ['finalPool' => 18],
         $authenticatedCookie
     );
-    assertTrue($manualFinalRake['status'] === 200, 'Unable to save the final rake');
-    assertTrue((float) ($manualFinalRake['body']['finalRake'] ?? -1) === 8.0, 'The final rake was not persisted');
+    assertTrue($manualFinalPool['status'] === 200, 'Unable to save the final pool amount');
+    assertTrue((float) ($manualFinalPool['body']['finalPool'] ?? -1) === 18.0, 'The final pool amount was not persisted');
+    assertTrue((float) ($manualFinalPool['body']['finalRake'] ?? -1) === 8.0, 'The pool error was counted twice when saving');
     $manualStats = request('GET', $baseUrl . '/api/sessions/' . $sessionId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($manualStats['body']['calculatedRake'] ?? -1) === 5.0, 'Manual rake changed the calculated rake');
     assertTrue((float) ($manualStats['body']['totalRake'] ?? -1) === 8.0, 'Session stats ignored the manual final rake');
@@ -429,6 +437,9 @@ try {
     $sessionWithFinalRake = request('GET', $baseUrl . '/api/sessions/' . $sessionId, null, $authenticatedCookie);
     assertTrue((float) ($sessionWithFinalRake['body']['calculated_rake'] ?? -1) === 5.0, 'Session detail omits calculated rake');
     assertTrue((float) ($sessionWithFinalRake['body']['effective_rake'] ?? -1) === 8.0, 'Session detail omits effective rake');
+    assertTrue((float) ($sessionWithFinalRake['body']['calculated_water_pool'] ?? -1) === 15.0, 'Session detail omits the calculated pool amount');
+    assertTrue((float) ($sessionWithFinalRake['body']['water_pool'] ?? -1) === 18.0, 'Session detail omits the final pool amount');
+    assertTrue((float) ($sessionWithFinalRake['body']['water_pool_adjustment'] ?? -1) === 10.0, 'Session detail omits the pool error adjustment');
     assertTrue(($sessionWithFinalRake['body']['is_fully_settled'] ?? false) === true, 'Session detail is missing completion state');
 
     $decimalFinalRake = request(
@@ -438,6 +449,20 @@ try {
         $authenticatedCookie
     );
     assertTrue($decimalFinalRake['status'] === 400, 'A decimal final rake was accepted');
+    $overPreciseFinalPool = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalPool' => 18.001],
+        $authenticatedCookie
+    );
+    assertTrue($overPreciseFinalPool['status'] === 400, 'A final pool amount with more than two decimals was accepted');
+    $decimalImpliedRake = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalPool' => 18.25],
+        $authenticatedCookie
+    );
+    assertTrue($decimalImpliedRake['status'] === 400, 'A final pool amount implying decimal rake was accepted');
 
     $negativeErrorSettlement = request(
         'POST',
@@ -454,13 +479,15 @@ try {
     assertTrue((float) ($negativeStats['body']['waterPoolAdjustment'] ?? 1) === -10.0, 'Negative error was not deducted from the water pool');
     assertTrue((float) ($negativeStats['body']['waterPool'] ?? 1) === -5.0, 'Negative-error water pool is incorrect');
 
-    $updatedFinalRake = request(
+    $updatedFinalPool = request(
         'PATCH',
         $baseUrl . '/api/sessions/' . $sessionId,
-        ['finalRake' => 7],
+        ['finalPool' => -3],
         $authenticatedCookie
     );
-    assertTrue($updatedFinalRake['status'] === 200, 'Unable to save the updated final rake');
+    assertTrue($updatedFinalPool['status'] === 200, 'Unable to save a negative final pool amount');
+    assertTrue((float) ($updatedFinalPool['body']['finalRake'] ?? -1) === 7.0, 'Negative error was counted twice when saving the final pool');
+    assertTrue((float) ($updatedFinalPool['body']['finalPool'] ?? 1) === -3.0, 'The negative final pool amount was not persisted');
 
     $groupStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($groupStats['body']['totalRake'] ?? -1) === 7.0, 'Group stats ignored the manual final rake');

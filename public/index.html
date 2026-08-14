@@ -196,17 +196,17 @@
               <span class="final-rake-icon" aria-hidden="true">✓</span>
               <div>
                 <span>全部玩家已结算</span>
-                <strong>最终抽水</strong>
+                <strong>最终入池金额</strong>
               </div>
             </div>
-            <p id="session-final-rake-note">系统计算 ¥0，保存后统计和水池以输入金额为准</p>
+            <p id="session-final-rake-note">已包含系统抽水和结算误差，保存后水池以输入金额为准</p>
           </div>
           <div class="final-rake-controls">
-            <label class="money-input" aria-label="本场最终抽水金额">
+            <label class="money-input" aria-label="本场最终入池金额">
               <span>¥</span>
-              <input type="number" id="session-final-rake" min="0" step="1" inputmode="numeric" value="0">
+              <input type="number" id="session-final-pool" step="0.01" inputmode="decimal" value="0">
             </label>
-            <button class="btn final-rake-save" id="session-final-rake-save" onclick="saveFinalRake()">保存</button>
+            <button class="btn final-rake-save" id="session-final-pool-save" onclick="saveFinalPool()">保存</button>
           </div>
         </div>
 

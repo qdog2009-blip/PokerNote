@@ -688,21 +688,25 @@ async function loadPlayers() {
 
   const settledPlayers = data.players.filter(player => player.final_balance !== null);
   const finalRakeSetting = document.getElementById('session-final-rake-setting');
-  const finalRakeInput = document.getElementById('session-final-rake');
-  const finalRakeSave = document.getElementById('session-final-rake-save');
+  const finalPoolInput = document.getElementById('session-final-pool');
+  const finalPoolSave = document.getElementById('session-final-pool-save');
   const isFullySettled = data.is_fully_settled === true;
   finalRakeSetting.hidden = !isFullySettled;
   if (isFullySettled) {
     const calculatedRake = Number(data.calculated_rake || 0);
-    const effectiveRake = Number(data.effective_rake || 0);
+    const poolAdjustment = Number(data.water_pool_adjustment || 0);
+    const calculatedPool = Number(data.calculated_water_pool ?? roundMoney(calculatedRake + poolAdjustment));
+    const effectivePool = Number(data.water_pool ?? calculatedPool);
     currentSession.finalRake = data.final_rake;
+    currentSession.finalPool = effectivePool;
+    currentSession.waterPoolAdjustment = poolAdjustment;
     currentSession.calculatedRake = calculatedRake;
-    finalRakeInput.value = Math.round(effectiveRake);
-    finalRakeInput.disabled = !editable;
-    finalRakeSave.hidden = !editable;
+    finalPoolInput.value = String(roundMoney(effectivePool));
+    finalPoolInput.disabled = !editable;
+    finalPoolSave.hidden = !editable;
     document.getElementById('session-final-rake-note').textContent = data.rake_overridden
-      ? `系统计算 ${formatRake(calculatedRake)}，当前统计使用已保存金额`
-      : `系统计算 ${formatRake(calculatedRake)}，保存后统计和水池以输入金额为准`;
+      ? `系统应入池 ${formatPool(calculatedPool)}（抽水 ${formatRake(calculatedRake)}，误差 ${formatPoolAdjustment(poolAdjustment)}），当前使用已保存金额`
+      : `已含抽水 ${formatRake(calculatedRake)} 和误差 ${formatPoolAdjustment(poolAdjustment)}`;
   }
   const errorSummary = document.getElementById('session-error-summary');
   if (settledPlayers.length > 0) {
@@ -809,23 +813,30 @@ async function saveRakeRate() {
   }
 }
 
-async function saveFinalRake() {
-  const input = document.getElementById('session-final-rake');
-  const finalRake = Number(input.value);
-  if (!Number.isInteger(finalRake) || finalRake < 0) {
-    alert('最终抽水必须是大于等于0的整数');
+async function saveFinalPool() {
+  const input = document.getElementById('session-final-pool');
+  const rawFinalPool = Number(input.value);
+  const finalPool = roundMoney(rawFinalPool);
+  if (!Number.isFinite(rawFinalPool) || Math.abs(rawFinalPool - finalPool) > 0.000001) {
+    alert('最终入池金额必须是最多保留2位小数的有效金额');
+    return;
+  }
+  const impliedRake = roundMoney(finalPool - Number(currentSession.waterPoolAdjustment || 0));
+  if (impliedRake < 0 || !Number.isInteger(impliedRake)) {
+    alert('最终入池金额扣除结算误差后，抽水部分必须是大于等于0的整数');
     return;
   }
 
   try {
     const result = await api('/sessions/' + currentSession.id, {
       method: 'PATCH',
-      body: JSON.stringify({ finalRake })
+      body: JSON.stringify({ finalPool })
     });
     currentSession.finalRake = result.finalRake;
+    currentSession.finalPool = result.finalPool;
     await loadPlayers();
     await loadSessions();
-    showToast(`最终抽水已保存为 ${formatRake(result.finalRake)}`);
+    showToast(`最终入池金额已保存为 ${formatPool(result.finalPool)}`);
   } catch (err) {
     alert(err.message);
   }

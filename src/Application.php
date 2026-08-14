@@ -576,6 +576,13 @@ final class Application
         );
         $session['calculated_rake'] = $stats['calculatedRake'];
         $session['effective_rake'] = $stats['totalRake'];
+        $session['settlement_error'] = $stats['error'];
+        $session['water_pool_adjustment'] = $stats['waterPoolAdjustment'];
+        $session['calculated_water_pool'] = round(
+            $stats['calculatedRake'] + $stats['waterPoolAdjustment'],
+            2
+        );
+        $session['water_pool'] = $stats['waterPool'];
         $session['is_fully_settled'] = $stats['isFullySettled'];
         $session['rake_overridden'] = $stats['isRakeOverridden'];
         $session['players'] = $players;
@@ -592,21 +599,37 @@ final class Application
         if (array_key_exists('rakeRate', $body)) {
             $updates[] = 'rake_rate = ?';
             $params[] = $this->rakeRate($body, 'rakeRate');
-            if (!array_key_exists('finalRake', $body)) {
+            if (!array_key_exists('finalRake', $body) && !array_key_exists('finalPool', $body)) {
                 $updates[] = 'final_rake = NULL';
             }
         }
 
-        if (array_key_exists('finalRake', $body)) {
+        if (array_key_exists('finalRake', $body) && array_key_exists('finalPool', $body)) {
+            throw new HttpException(400, '最终抽水和最终入池金额不能同时设置');
+        }
+
+        if (array_key_exists('finalRake', $body) || array_key_exists('finalPool', $body)) {
             $completion = $this->calculateSessionStats(
                 $sessionId,
                 (float) $sessionAccess['rake_rate'],
                 null
             );
             if (!$completion['isFullySettled']) {
-                throw new HttpException(400, '全部玩家结算后才能设置最终抽水');
+                throw new HttpException(400, '全部玩家结算后才能设置最终入池金额');
             }
-            $finalRake = $this->nonNegativeInteger($body, 'finalRake', '最终抽水');
+            if (array_key_exists('finalPool', $body)) {
+                $finalPool = $this->moneyAmount($body, 'finalPool', '最终入池金额');
+                $finalRake = round($finalPool - $completion['waterPoolAdjustment'], 2);
+                if ($finalRake < 0) {
+                    throw new HttpException(400, '最终入池金额扣除误差后不能使抽水小于0');
+                }
+                if (abs($finalRake - round($finalRake)) > 0.000001) {
+                    throw new HttpException(400, '最终入池金额扣除误差后，抽水部分必须是整数');
+                }
+                $finalRake = round($finalRake);
+            } else {
+                $finalRake = $this->nonNegativeInteger($body, 'finalRake', '最终抽水');
+            }
             $updates[] = 'final_rake = ?';
             $params[] = $finalRake;
         }
@@ -632,10 +655,17 @@ final class Application
         $statement->execute($params);
 
         $session = $this->castSession($this->accessibleSession($sessionId, $userId, 'view'));
+        $stats = $this->calculateSessionStats(
+            $sessionId,
+            (float) $session['rake_rate'],
+            $session['final_rake']
+        );
         $this->json([
             'success' => true,
             'rakeRate' => $session['rake_rate'],
             'finalRake' => $session['final_rake'],
+            'finalPool' => $stats['waterPool'],
+            'waterPoolAdjustment' => $stats['waterPoolAdjustment'],
             'groupId' => $session['group_id'],
             'groupName' => $session['group_name'],
         ]);
@@ -1313,6 +1343,16 @@ final class Application
             throw new HttpException(400, $label . '必须是大于等于0的整数');
         }
         return $value;
+    }
+
+    private function moneyAmount(array $body, string $key, string $label): float
+    {
+        $value = $this->number($body, $key, $label);
+        $rounded = round($value, 2);
+        if (abs($value - $rounded) > 0.000001) {
+            throw new HttpException(400, $label . '最多保留2位小数');
+        }
+        return $rounded;
     }
 
     private function rakeRate(array $body, string $key): float
