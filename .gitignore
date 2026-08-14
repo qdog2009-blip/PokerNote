@@ -1,4 +1,5 @@
 node_modules/
+vendor/
 *.log
 *.db
 .DS_Store

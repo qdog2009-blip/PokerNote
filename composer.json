@@ -1,0 +1,14 @@
+{
+  "name": "pokernote/pokernote",
+  "description": "德州扑克玩家买入和结算记录工具",
+  "type": "project",
+  "require": {
+    "php": ">=7.4 <8.0",
+    "ext-json": "*",
+    "ext-pdo": "*",
+    "ext-pdo_sqlite": "*"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

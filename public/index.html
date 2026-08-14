@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PokerNote - 德州扑克记录</title>
+  <title>PokerNote - 记录器</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
     @font-face {
@@ -28,7 +28,7 @@
     <!-- 登录页 -->
     <div id="page-login" class="page active">
       <div class="container">
-        <h1 class="emoji">🃏 德州扑克记录</h1>
+        <h1 class="emoji">🃏 记录器</h1>
         <div class="card">
           <div class="tabs">
             <button class="tab active" data-tab="login">登录</button>
@@ -66,11 +66,17 @@
     <div id="page-sessions" class="page">
       <header>
         <h2>我的场次</h2>
-        <button id="btn-logout" class="btn small">登出</button>
+        <div class="header-actions">
+          <button id="btn-change-password" class="btn small">修改密码</button>
+          <button id="btn-logout" class="btn small">登出</button>
+        </div>
       </header>
       <div class="container">
-        <button id="btn-new-session" class="btn primary block">+ 创建新场次</button>
-        <div id="sessions-list" class="list"></div>
+        <div class="session-actions">
+          <button id="btn-new-session" class="btn primary">+ 创建新场次</button>
+          <button id="btn-new-group" class="btn group-create-btn">+ 新建分组</button>
+        </div>
+        <div id="sessions-list" class="grouped-session-list"></div>
       </div>
     </div>
     
@@ -82,11 +88,45 @@
         <button class="btn small" onclick="showSessionStats()">📊 统计</button>
       </header>
       <div class="container">
-        <div class="section">
+        <div class="group-setting">
+          <div class="group-setting-copy">
+            <span class="group-icon">⌗</span>
+            <div>
+              <div class="group-setting-label">所属分组</div>
+              <strong id="session-group-summary">默认分组</strong>
+            </div>
+          </div>
+          <div class="group-controls" id="session-group-controls">
+            <select id="session-group-select" aria-label="场次所属分组"></select>
+            <button class="btn group-save" onclick="saveSessionGroup()">保存</button>
+          </div>
+        </div>
+
+        <div class="rake-setting">
+          <div class="rake-setting-copy">
+            <div class="rake-title">
+              <span class="rake-dot"></span>
+              本场抽水
+              <strong id="session-rake-summary">0%</strong>
+            </div>
+            <p>仅按最终盈利玩家的盈利金额计算</p>
+          </div>
+          <div class="rake-controls" id="session-rake-controls">
+            <label class="percent-input" aria-label="本场抽水比例">
+              <input type="number" id="session-rake-rate" min="0" max="100" step="0.01" inputmode="decimal" value="0">
+              <span>%</span>
+            </label>
+            <button class="btn rake-save" onclick="saveRakeRate()">保存</button>
+          </div>
+        </div>
+
+        <div class="section" id="session-player-entry">
           <h3>添加玩家</h3>
           <div class="input-row">
-            <input type="text" id="player-name" list="player-history" placeholder="玩家姓名" autocomplete="off">
-            <datalist id="player-history"></datalist>
+            <div id="player-name-picker" class="player-name-picker">
+              <input type="text" id="player-name" placeholder="玩家姓名" autocomplete="off" aria-autocomplete="list" aria-controls="player-history-suggestions" aria-expanded="false">
+              <div id="player-history-suggestions" class="player-history-suggestions" role="listbox" hidden></div>
+            </div>
             <input type="number" id="player-initial" placeholder="带入(可选)" style="width:100px">
             <button class="btn" onclick="addPlayer()">添加</button>
           </div>
@@ -94,7 +134,11 @@
         
         <div class="section">
           <h3>玩家列表</h3>
-          <div class="input-row" style="margin-bottom:12px;">
+          <div id="session-error-summary" class="session-error-summary" hidden>
+            <span>本场当前误差</span>
+            <strong id="session-error-amount">¥0.00</strong>
+          </div>
+          <div class="input-row" id="session-buyin-action" style="margin-bottom:12px;">
             <button class="btn success" onclick="openBuyinModal()" style="flex:1;">💰</button>
           </div>
           <div id="players-list" class="list"></div>
@@ -132,12 +176,16 @@
             <span class="value" id="player-final">-</span>
           </div>
           <div class="stat">
-            <span class="label">战绩</span>
+            <span class="label">抽水</span>
+            <span class="value rake-value" id="player-rake">-</span>
+          </div>
+          <div class="stat">
+            <span class="label">净战绩</span>
             <span class="value" id="player-profit">-</span>
           </div>
         </div>
         
-        <div class="section">
+        <div class="section" id="player-buyin-entry">
           <h3>买入记录</h3>
           <div class="input-row">
             <input type="number" id="buyin-amount" placeholder="买入金额">
@@ -146,7 +194,7 @@
           <div id="buyins-list" class="list small"></div>
         </div>
         
-        <div class="section">
+        <div class="section" id="player-settlement-entry">
           <h3>结算</h3>
           <div class="settlement">
             <div class="input-row">
@@ -159,6 +207,7 @@
               <button class="btn success" onclick="settle('profit')">水上</button>
               <button class="btn danger" onclick="settle('loss')">水下</button>
             </div>
+            <p class="settlement-note" id="settlement-rake-note">盈利玩家按本场抽水比例计算净战绩</p>
           </div>
         </div>
       </div>
@@ -177,15 +226,100 @@
             <span id="stat-total-buyin">0</span>
           </div>
           <div class="summary-row">
-            <span>结算总额</span>
+            <span>结算总额（抽水前）</span>
             <span id="stat-total-settled">0</span>
           </div>
-          <div class="summary-row error" id="stat-error-row">
-            <span>误差</span>
+          <div class="summary-row">
+            <span>抽水比例</span>
+            <span id="stat-rake-rate">0%</span>
+          </div>
+          <div class="summary-row rake-summary">
+            <span>盈利玩家抽水</span>
+            <span id="stat-total-rake">0</span>
+          </div>
+          <div class="summary-row pool-adjustment" id="stat-error-row">
+            <span id="stat-error-label">水池误差调整</span>
             <span id="stat-error">0</span>
+          </div>
+          <div class="summary-row water-pool-summary" id="stat-water-pool-row">
+            <span>最终水池</span>
+            <span id="stat-water-pool">0</span>
+          </div>
+          <div class="summary-row net-summary">
+            <span>玩家净结算</span>
+            <span id="stat-net-settled">0</span>
           </div>
         </div>
         <div id="stats-list" class="list"></div>
+      </div>
+    </div>
+
+    <!-- 分组统计页 -->
+    <div id="page-group-stats" class="page">
+      <header>
+        <button class="btn back" onclick="goBack()">← 返回</button>
+        <h2 id="group-stats-title">分组统计</h2>
+        <button id="btn-group-share" class="btn small" onclick="openGroupShareModal()" hidden>分享</button>
+      </header>
+      <div class="container">
+        <div class="group-ledger-card">
+          <div>
+            <div class="group-ledger-kicker">分组总账</div>
+            <div id="group-stat-access" class="group-ledger-access">我创建的分组</div>
+          </div>
+          <div class="group-ledger-count" id="group-stat-session-count">0 场</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-row">
+            <span>总买入</span>
+            <span id="group-stat-total-buyin">0</span>
+          </div>
+          <div class="summary-row">
+            <span>结算总额（抽水前）</span>
+            <span id="group-stat-total-settled">0</span>
+          </div>
+          <div class="summary-row rake-summary">
+            <span>盈利玩家抽水</span>
+            <span id="group-stat-total-rake">0</span>
+          </div>
+          <div class="summary-row pool-adjustment" id="group-stat-error-row">
+            <span id="group-stat-error-label">水池误差调整</span>
+            <span id="group-stat-error">0</span>
+          </div>
+          <div class="summary-row pool-expense-summary">
+            <span>水池支出</span>
+            <span id="group-stat-pool-expenses">0</span>
+          </div>
+          <div class="summary-row water-pool-summary" id="group-stat-water-pool-row">
+            <span>水池余额</span>
+            <span id="group-stat-water-pool">0</span>
+          </div>
+          <div class="summary-row net-summary">
+            <span>玩家净结算</span>
+            <span id="group-stat-net-settled">0</span>
+          </div>
+        </div>
+
+        <div class="section group-stat-section">
+          <h3>玩家累计</h3>
+          <div id="group-player-list" class="list"></div>
+        </div>
+        <div class="section group-stat-section">
+          <h3>场次小计</h3>
+          <div id="group-session-list" class="list"></div>
+        </div>
+        <details id="group-expense-details" class="section group-stat-section collapsible-section">
+          <summary>
+            <span class="details-title">水池支出明细</span>
+            <span id="group-expense-count" class="details-count">0 笔</span>
+          </summary>
+          <div class="collapsible-content">
+            <div class="expense-actions">
+              <button id="btn-add-group-expense" class="btn pool-expense-add" onclick="openGroupExpenseModal()">+ 添加支出</button>
+            </div>
+            <div id="group-expense-list" class="list"></div>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -195,12 +329,102 @@
     <div class="modal-content">
       <h3>创建新场次</h3>
       <input type="text" id="session-name" placeholder="场次名称 (如: 2024年1月周五局)">
+      <div class="modal-field">
+        <label for="session-create-group">所属分组</label>
+        <select id="session-create-group"></select>
+        <small class="group-help">不选择时使用默认分组</small>
+      </div>
+      <div class="modal-field">
+        <label for="session-create-rake-rate">抽水比例</label>
+        <div class="percent-input create-rake-input">
+          <input type="number" id="session-create-rake-rate" min="0" max="100" step="0.01" inputmode="decimal" value="0">
+          <span>%</span>
+        </div>
+        <small>只对最终盈利玩家的盈利部分抽水</small>
+      </div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal('modal-session')">取消</button>
         <button class="btn primary" onclick="createSession()">创建</button>
       </div>
     </div>
   </div>
+
+  <!-- 创建分组弹窗 -->
+  <div id="modal-group" class="modal">
+    <div class="modal-content">
+      <h3>新建场次分组</h3>
+      <input type="text" id="group-name" maxlength="50" placeholder="分组名称（如：周五牌局）">
+      <p class="modal-tip">分组用于汇总多场游戏的数据；未设置的场次会保留在默认分组。</p>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modal-group')">取消</button>
+        <button class="btn primary" onclick="createGroup()">创建分组</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加水池支出弹窗 -->
+  <div id="modal-group-expense" class="modal">
+    <div class="modal-content">
+      <h3>添加水池支出</h3>
+      <div class="modal-field">
+        <label for="group-expense-amount">支出金额</label>
+        <input type="number" id="group-expense-amount" min="0.01" step="0.01" inputmode="decimal" placeholder="输入金额">
+      </div>
+      <div class="modal-field">
+        <label for="group-expense-note">备注</label>
+        <input type="text" id="group-expense-note" maxlength="200" placeholder="如：场地费、饮料费">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modal-group-expense')">取消</button>
+        <button class="btn primary" onclick="createGroupPoolExpense()">确认支出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改密码弹窗 -->
+  <div id="modal-change-password" class="modal">
+    <div class="modal-content">
+      <h3>修改密码</h3>
+      <div class="modal-field">
+        <label for="current-password">当前密码</label>
+        <input type="password" id="current-password" autocomplete="current-password" placeholder="输入当前密码">
+      </div>
+      <div class="modal-field">
+        <label for="new-password">新密码</label>
+        <input type="password" id="new-password" minlength="6" autocomplete="new-password" placeholder="至少6位">
+      </div>
+      <div class="modal-field">
+        <label for="confirm-new-password">确认新密码</label>
+        <input type="password" id="confirm-new-password" minlength="6" autocomplete="new-password" placeholder="再次输入新密码">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modal-change-password')">取消</button>
+        <button class="btn primary" onclick="changePassword()">保存密码</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分组分享弹窗 -->
+  <div id="modal-group-share" class="modal">
+    <div class="modal-content share-modal-content">
+      <h3>分享分组</h3>
+      <p class="modal-tip">对方需要先注册。查看权限只能浏览；录入权限可维护场次数据和水池支出。</p>
+      <div class="share-form">
+        <input type="email" id="share-user-email" placeholder="指定用户邮箱">
+        <select id="share-permission" aria-label="分享权限">
+          <option value="view">查看</option>
+          <option value="input">录入</option>
+        </select>
+        <button class="btn primary" onclick="saveGroupShare()">添加/更新</button>
+      </div>
+      <div id="group-share-list" class="list share-list"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modal-group-share')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
   
   <script src="js/app.js"></script>
 </body>
