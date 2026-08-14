@@ -117,11 +117,13 @@ if (!is_resource($process)) {
 try {
     $baseUrl = 'http://127.0.0.1:' . $port;
     $ready = false;
+    $rootResponseHeaders = [];
     $readinessContext = stream_context_create(['http' => ['timeout' => 0.2]]);
     for ($attempt = 0; $attempt < 30; $attempt++) {
         $root = @file_get_contents($baseUrl . '/', false, $readinessContext);
         if (is_string($root)) {
             $ready = true;
+            $rootResponseHeaders = isset($http_response_header) ? $http_response_header : [];
             break;
         }
         usleep(100000);
@@ -129,6 +131,29 @@ try {
     assertTrue(
         $ready,
         'The PHP test server did not become ready: ' . trim((string) file_get_contents($serverLogPath))
+    );
+
+    $styleVersion = substr((string) hash_file('sha256', $projectRoot . '/public/css/style.css'), 0, 12);
+    $appVersion = substr((string) hash_file('sha256', $projectRoot . '/public/js/app.js'), 0, 12);
+    $fontVersion = substr((string) hash_file('sha256', $projectRoot . '/public/fonts/NotoSansSC.ttf'), 0, 12);
+    assertTrue(strpos((string) $root, '/css/style.css?v=' . $styleVersion) !== false, 'The app shell has a stale CSS version');
+    assertTrue(strpos((string) $root, '/js/app.js?v=' . $appVersion) !== false, 'The app shell has a stale JavaScript version');
+    assertTrue(strpos((string) $root, '/fonts/NotoSansSC.ttf?v=' . $fontVersion) !== false, 'The app shell has a stale font version');
+    assertTrue(strpos((string) $root, '__STYLE_VERSION__') === false, 'The app shell contains an unresolved asset placeholder');
+    $cacheHeaders = array_filter($rootResponseHeaders, function (string $header): bool {
+        return stripos($header, 'Cache-Control:') === 0;
+    });
+    assertTrue(
+        count(array_filter($cacheHeaders, function (string $header): bool {
+            return stripos($header, 'no-store') !== false;
+        })) === 1,
+        'The app shell can still be cached with stale asset versions'
+    );
+
+    $renderedIndex = @file_get_contents($baseUrl . '/index.html', false, $readinessContext);
+    assertTrue(
+        is_string($renderedIndex) && strpos($renderedIndex, '/css/style.css?v=' . $styleVersion) !== false,
+        'Direct index.html requests bypass automatic asset versioning'
     );
 
     $email = 'smoke-' . bin2hex(random_bytes(8)) . '@example.com';

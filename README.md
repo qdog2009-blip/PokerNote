@@ -108,7 +108,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-该模式不需要运行 `php -S 127.0.0.1:3000`。Nginx 会直接提供 HTML、CSS、JavaScript 和字体文件，`/api` 与 `/api/` 下的请求会重写到 `public/index.php`，再由 `php7.inc` 交给 PHP-FPM。PHP-FPM 的运行用户需要对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
+该模式不需要运行 `php -S 127.0.0.1:3000`。Nginx 会直接提供 CSS、JavaScript 和字体文件，页面入口与 `/api` 请求由 `public/index.php` 交给 PHP-FPM。PHP-FPM 的运行用户需要对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
+
+页面入口会自动对 CSS、JavaScript 和字体内容计算 SHA-256 短哈希，并把哈希加入资源 URL。静态文件仍可保留长期缓存，但文件内容一旦变化，浏览器会自动请求新 URL，不需要每次发布手工修改版本号。部署旧版本配置的站点需要同步更新 `deploy/nginx/pokernote.conf`，确保 `index.php` 排在 `index.html` 前面；无需修改公用的 `php7.inc` 或 `common.inc`。
 
 登录或注册成功后，后端会生成随机 Token，仅把 SHA-256 哈希保存到数据库，浏览器将 Token 原文持久化到 `localStorage`，后续请求通过普通的 `X-PokerNote-Token` 请求头验证，无需修改公用 PHP-FPM 配置。后端也兼容 `Authorization: Bearer`。Token 不自动过期；主动退出会删除当前 Token，修改密码会撤销该账号的全部旧 Token并签发新 Token。替换数据库后，原数据库签发的 Token 会自动失效，需要重新登录。
 
