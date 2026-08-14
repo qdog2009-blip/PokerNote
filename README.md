@@ -1,11 +1,11 @@
-# PokerNote - 德州扑克记录工具
+# PokerNote - 记分器
 
 <div align="center">
 
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-7.4-777BB4.svg)
 
-一个简单好用的德州扑克玩家买入和结算记录工具，支持多人游戏数据管理。
+一个简单好用的德州扑克玩家买入和结算记分器，支持多人游戏数据管理。
 
 </div>
 
