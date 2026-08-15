@@ -4,6 +4,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  touch-action: pan-y;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -514,7 +519,38 @@ select:focus {
   border-bottom: 1px solid #cce9e3;
 }
 
+.session-group:not(.expanded) .session-group-header {
+  border-bottom-color: transparent;
+}
+
+.session-group-toggle {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-group-toggle:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid rgba(15, 118, 110, 0.35);
+  outline-offset: 3px;
+}
+
+.session-group-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .session-group-name {
+  display: block;
   color: #115e59;
   font-size: 16px;
   font-weight: 700;
@@ -544,9 +580,23 @@ select:focus {
 }
 
 .session-group-count {
+  display: block;
   margin-top: 2px;
   color: #5d8f89;
   font-size: 13px;
+}
+
+.session-group-chevron {
+  flex: 0 0 auto;
+  margin: 0 4px 0 10px;
+  color: var(--group);
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.session-group-toggle[aria-expanded="true"] .session-group-chevron {
+  transform: rotate(180deg);
 }
 
 .btn.group-stats-btn {

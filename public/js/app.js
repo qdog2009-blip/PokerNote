@@ -436,14 +436,23 @@ async function loadSessions() {
     return `
       <section class="session-group">
         <div class="session-group-header">
-          <div>
-            <div class="session-group-name">
-              ${escapeHtml(group.name)}
-              ${group.is_default && group.access_level === 'owner' ? '<span class="default-group-badge">默认</span>' : ''}
-              ${group.access_level !== 'owner' ? `<span class="shared-group-badge">共享${group.access_level === 'input' ? '录入' : '查看'}</span>` : ''}
-            </div>
-            <div class="session-group-count">${groupedSessions.length} 场${group.access_level !== 'owner' ? ` · 来自 ${escapeHtml(group.owner_email)}` : ''}</div>
-          </div>
+          <button
+            type="button"
+            class="session-group-toggle"
+            aria-expanded="false"
+            aria-controls="session-group-list-${group.id}"
+            onclick="toggleSessionGroup(this)"
+          >
+            <span class="session-group-copy">
+              <span class="session-group-name">
+                ${escapeHtml(group.name)}
+                ${group.is_default && group.access_level === 'owner' ? '<span class="default-group-badge">默认</span>' : ''}
+                ${group.access_level !== 'owner' ? `<span class="shared-group-badge">共享${group.access_level === 'input' ? '录入' : '查看'}</span>` : ''}
+              </span>
+              <span class="session-group-count">${groupedSessions.length} 场${group.access_level !== 'owner' ? ` · 来自 ${escapeHtml(group.owner_email)}` : ''}</span>
+            </span>
+            <span class="session-group-chevron" aria-hidden="true">⌄</span>
+          </button>
           <div class="session-group-actions">
             <button class="btn group-stats-btn" onclick="showGroupStats(${group.id})">分组统计 →</button>
             ${group.access_level === 'owner' && !group.is_default && groupedSessions.length === 0
@@ -451,10 +460,22 @@ async function loadSessions() {
               : ''}
           </div>
         </div>
-        <div class="list">${sessionItems}</div>
+        <div id="session-group-list-${group.id}" class="list" hidden>${sessionItems}</div>
       </section>
     `;
   }).join('');
+}
+
+function toggleSessionGroup(button) {
+  const listId = button.getAttribute('aria-controls');
+  const list = listId ? document.getElementById(listId) : null;
+  if (!list) return;
+
+  const expanded = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  list.hidden = !expanded;
+  const group = button.closest('.session-group');
+  if (group) group.classList.toggle('expanded', expanded);
 }
 
 async function deleteGroup(id) {
