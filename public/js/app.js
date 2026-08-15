@@ -1140,7 +1140,6 @@ async function showGroupStats(groupId, navigate = true) {
     document.getElementById('group-stat-total-rake').textContent = formatRake(data.totalRake);
     document.getElementById('group-stat-pool-expenses').textContent = formatPool(-Number(data.totalPoolExpenses || 0));
     renderWaterPool('group-stat', data.waterPool);
-    document.getElementById('group-stat-net-settled').textContent = formatMoney(data.totalNetSettled);
     renderPoolAdjustment('group-stat', data.waterPoolAdjustment);
 
     const sessionList = document.getElementById('group-session-list');
