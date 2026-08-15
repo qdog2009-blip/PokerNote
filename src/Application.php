@@ -860,6 +860,7 @@ final class Application
                         'name' => $name,
                         'sessionIds' => [],
                         'settledSessionIds' => [],
+                        'winningSessionIds' => [],
                         'buyin' => 0.0,
                         'final' => 0.0,
                         'netFinal' => 0.0,
@@ -878,6 +879,9 @@ final class Application
                     $playerTotals[$name]['grossProfitLoss'] += $player['grossProfitLoss'];
                     $playerTotals[$name]['rake'] += $player['rake'];
                     $playerTotals[$name]['profitLoss'] += $player['profitLoss'];
+                    if ($player['grossProfitLoss'] > 0) {
+                        $playerTotals[$name]['winningSessionIds'][$sessionId] = true;
+                    }
                 }
             }
         }
@@ -890,6 +894,7 @@ final class Application
                 'name' => $player['name'],
                 'sessionCount' => count($player['sessionIds']),
                 'settledSessionCount' => $settledSessionCount,
+                'winningSessionCount' => count($player['winningSessionIds']),
                 'buyin' => round($player['buyin'], 2),
                 'final' => $hasSettlement ? round($player['final'], 2) : null,
                 'netFinal' => $hasSettlement ? round($player['netFinal'], 2) : null,
@@ -899,9 +904,16 @@ final class Application
             ];
         }
         usort($players, function (array $left, array $right): int {
-            $leftValue = $left['profitLoss'] === null ? -PHP_FLOAT_MAX : $left['profitLoss'];
-            $rightValue = $right['profitLoss'] === null ? -PHP_FLOAT_MAX : $right['profitLoss'];
-            return $rightValue <=> $leftValue;
+            $sessionComparison = $right['sessionCount'] <=> $left['sessionCount'];
+            if ($sessionComparison !== 0) {
+                return $sessionComparison;
+            }
+            $leftValue = $left['grossProfitLoss'] === null ? -PHP_FLOAT_MAX : $left['grossProfitLoss'];
+            $rightValue = $right['grossProfitLoss'] === null ? -PHP_FLOAT_MAX : $right['grossProfitLoss'];
+            $resultComparison = $rightValue <=> $leftValue;
+            return $resultComparison !== 0
+                ? $resultComparison
+                : strcmp($left['name'], $right['name']);
         });
 
         $expenseStatement = $this->pdo->prepare(

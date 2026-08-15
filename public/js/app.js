@@ -1175,24 +1175,15 @@ async function showGroupStats(groupId, navigate = true) {
     const playerList = document.getElementById('group-player-list');
     playerList.innerHTML = data.players.length > 0
       ? data.players.map(player => {
-          let profitText = '-';
-          let profitClass = '';
-          if (player.profitLoss !== null) {
-            profitText = player.profitLoss >= 0
-              ? `净水上${formatMoney(player.profitLoss)}`
-              : `水下${formatMoney(Math.abs(player.profitLoss))}`;
-            profitClass = player.profitLoss >= 0 ? 'profit' : 'loss';
-          }
+          const grossResult = player.grossProfitLoss === null
+            ? '待结算'
+            : formatPoolAdjustment(player.grossProfitLoss);
 
           return `
             <div class="list-item">
               <div class="info">
                 <div class="name">${escapeHtml(player.name)}</div>
-                <div class="meta">参与 ${player.sessionCount} 场 · 已结算 ${player.settledSessionCount} 场 · 买入 ${formatMoney(player.buyin)}</div>
-              </div>
-              <div class="player-result">
-                <div class="amount ${profitClass}">${profitText}</div>
-                ${player.rake > 0 ? `<div class="rake-note">累计抽水 ${formatRake(player.rake)}</div>` : ''}
+                <div class="meta">参与${player.sessionCount}场，水上${player.winningSessionCount}场，总战绩${grossResult}</div>
               </div>
             </div>
           `;

@@ -489,6 +489,68 @@ try {
     assertTrue((float) ($updatedFinalPool['body']['finalRake'] ?? -1) === 7.0, 'Negative error was counted twice when saving the final pool');
     assertTrue((float) ($updatedFinalPool['body']['finalPool'] ?? 1) === -3.0, 'The negative final pool amount was not persisted');
 
+    $rankingSession = request(
+        'POST',
+        $baseUrl . '/api/sessions',
+        ['name' => '玩家累计排序测试', 'rakeRate' => 0, 'groupId' => $groupId],
+        $authenticatedCookie
+    );
+    assertTrue($rankingSession['status'] === 200, 'Unable to create the player-ranking test session');
+    $rankingSessionId = (int) ($rankingSession['body']['sessionId'] ?? 0);
+    $returningWinner = request(
+        'POST',
+        $baseUrl . '/api/sessions/' . $rankingSessionId . '/players',
+        ['name' => '赢家', 'initialBuyin' => 100],
+        $authenticatedCookie
+    );
+    $singleSessionPlayer = request(
+        'POST',
+        $baseUrl . '/api/sessions/' . $rankingSessionId . '/players',
+        ['name' => '单场玩家', 'initialBuyin' => 50],
+        $authenticatedCookie
+    );
+    assertTrue(
+        $returningWinner['status'] === 200 && $singleSessionPlayer['status'] === 200,
+        'Unable to create players for cumulative ranking testing'
+    );
+    $returningWinnerSettlement = request(
+        'POST',
+        $baseUrl . '/api/players/' . (int) ($returningWinner['body']['playerId'] ?? 0) . '/settle',
+        ['finalBalance' => 120],
+        $authenticatedCookie
+    );
+    $singleSessionSettlement = request(
+        'POST',
+        $baseUrl . '/api/players/' . (int) ($singleSessionPlayer['body']['playerId'] ?? 0) . '/settle',
+        ['finalBalance' => 40],
+        $authenticatedCookie
+    );
+    assertTrue(
+        $returningWinnerSettlement['status'] === 200 && $singleSessionSettlement['status'] === 200,
+        'Unable to settle players for cumulative ranking testing'
+    );
+
+    $rankingStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
+    $rankedPlayers = $rankingStats['body']['players'] ?? [];
+    assertTrue(($rankedPlayers[0]['name'] ?? null) === '赢家', 'Players are not sorted by session count descending');
+    assertTrue((int) ($rankedPlayers[0]['sessionCount'] ?? 0) === 2, 'Cumulative session count is incorrect');
+    assertTrue((int) ($rankedPlayers[0]['winningSessionCount'] ?? 0) === 2, 'Winning session count is incorrect');
+    assertTrue((float) ($rankedPlayers[0]['grossProfitLoss'] ?? -1) === 70.0, 'Pre-rake cumulative result is incorrect');
+    for ($playerIndex = 1; $playerIndex < count($rankedPlayers); $playerIndex++) {
+        assertTrue(
+            (int) $rankedPlayers[$playerIndex - 1]['sessionCount'] >= (int) $rankedPlayers[$playerIndex]['sessionCount'],
+            'Player session counts are not in descending order'
+        );
+    }
+
+    $rankingSessionDelete = request(
+        'DELETE',
+        $baseUrl . '/api/sessions/' . $rankingSessionId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($rankingSessionDelete['status'] === 200, 'Unable to remove the player-ranking test session');
+
     $groupStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($groupStats['body']['totalRake'] ?? -1) === 7.0, 'Group stats ignored the manual final rake');
     assertTrue((float) ($groupStats['body']['waterPoolAdjustment'] ?? 1) === -10.0, 'Group water-pool adjustment is incorrect');
