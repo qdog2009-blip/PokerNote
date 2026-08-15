@@ -532,6 +532,19 @@ try {
 
     $rankingStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
     $rankedPlayers = $rankingStats['body']['players'] ?? [];
+    $rankingSessions = $rankingStats['body']['sessions'] ?? [];
+    $rankingSessionStats = null;
+    foreach ($rankingSessions as $sessionStats) {
+        if ((int) ($sessionStats['id'] ?? 0) === $rankingSessionId) {
+            $rankingSessionStats = $sessionStats;
+            break;
+        }
+    }
+    assertTrue(is_array($rankingSessionStats), 'The player-ranking session is missing from group stats');
+    assertTrue(
+        ($rankingSessionStats['playerNames'] ?? []) === ['赢家', '单场玩家'],
+        'Session player names are missing or out of order in group stats'
+    );
     assertTrue(($rankedPlayers[0]['name'] ?? null) === '赢家', 'Players are not sorted by session count descending');
     assertTrue((int) ($rankedPlayers[0]['sessionCount'] ?? 0) === 2, 'Cumulative session count is incorrect');
     assertTrue((int) ($rankedPlayers[0]['winningSessionCount'] ?? 0) === 2, 'Winning session count is incorrect');

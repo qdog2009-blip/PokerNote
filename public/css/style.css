@@ -30,7 +30,7 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .page {
@@ -56,7 +56,7 @@ header {
 }
 
 header h2 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -73,11 +73,11 @@ header h2 {
 h1 {
   text-align: center;
   margin-bottom: 32px;
-  font-size: 28px;
+  font-size: 30px;
 }
 
 h3 {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-light);
   margin-bottom: 12px;
   text-transform: uppercase;
@@ -102,7 +102,7 @@ h3 {
   padding: 12px;
   border: none;
   background: none;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   color: var(--text-light);
   border-bottom: 2px solid transparent;
@@ -120,7 +120,7 @@ h3 {
 .form-group label {
   display: block;
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-light);
 }
 
@@ -130,7 +130,7 @@ select {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 18px;
   background: var(--card);
   color: var(--text);
   outline: none;
@@ -147,7 +147,7 @@ select:focus {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -176,7 +176,7 @@ select:focus {
 
 .btn.small {
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .btn.block {
@@ -221,7 +221,7 @@ select:focus {
 
 .create-session-kicker {
   color: #9db4ff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1.8px;
 }
@@ -229,7 +229,7 @@ select:focus {
 .create-session-hero h3 {
   margin: 7px 0 6px;
   color: #fff;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -238,7 +238,7 @@ select:focus {
 .create-session-hero p {
   max-width: 400px;
   color: #c9d4f4;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -254,7 +254,7 @@ select:focus {
   background: linear-gradient(145deg, #fff, #e8edff);
   border: 1px solid rgba(255,255,255,0.65);
   border-radius: 12px;
-  font-size: 39px;
+  font-size: 41px;
   box-shadow: 0 12px 24px rgba(0,0,0,0.2);
   transform: rotate(7deg);
 }
@@ -284,21 +284,21 @@ select:focus {
   color: #fff;
   background: #1f3157;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .create-card-heading h3 {
   margin: 0 0 2px;
   color: #253352;
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0;
   text-transform: none;
 }
 
 .create-card-heading p {
   color: var(--text-light);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .create-card-heading p strong {
@@ -324,14 +324,14 @@ select:focus {
   display: block;
   margin-bottom: 6px;
   color: #657087;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .create-field input,
 .create-field select {
   padding: 10px 11px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .create-number-input {
@@ -356,7 +356,7 @@ select:focus {
 .create-number-input b {
   padding-right: 11px;
   color: var(--primary);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .create-number-input.money b {
@@ -379,7 +379,7 @@ select:focus {
 .player-pick-actions .btn {
   padding: 6px 9px;
   color: #51617e;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .create-player-grid {
@@ -432,7 +432,7 @@ select:focus {
   background: #fff;
   border: 1px solid #cbd2df;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -444,7 +444,7 @@ select:focus {
 
 .create-player-name {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -458,7 +458,7 @@ select:focus {
   border: 1px dashed #ccd3df;
   border-radius: 9px;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .create-session-submit {
@@ -516,7 +516,7 @@ select:focus {
 
 .session-group-name {
   color: #115e59;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -527,7 +527,7 @@ select:focus {
   background: #fff;
   border: 1px solid #a7ddd4;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -538,7 +538,7 @@ select:focus {
   color: #0f766e;
   background: #ccfbf1;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   vertical-align: middle;
 }
@@ -546,7 +546,7 @@ select:focus {
 .session-group-count {
   margin-top: 2px;
   color: #5d8f89;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .btn.group-stats-btn {
@@ -554,7 +554,7 @@ select:focus {
   color: #fff;
   background: var(--group);
   border-color: var(--group);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .session-group-actions {
@@ -569,7 +569,7 @@ select:focus {
   color: var(--danger);
   background: #fff;
   border-color: #fecaca;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .btn.group-delete-btn:hover {
@@ -590,7 +590,7 @@ select:focus {
   padding: 14px;
   color: var(--text-light);
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .list {
@@ -620,18 +620,18 @@ select:focus {
 
 .list-item .name {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 17px;
   margin-bottom: 2px;
 }
 
 .list-item .meta {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-light);
 }
 
 .list-item .amount {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .list-item .amount.profit {
@@ -661,7 +661,7 @@ select:focus {
 #players-list .settlement-breakdown {
   margin-top: 3px;
   color: var(--text-light);
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -675,7 +675,7 @@ select:focus {
   background: #fff1f2;
   border: 1px solid #fecdd3;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .session-error-summary.balanced {
@@ -685,7 +685,7 @@ select:focus {
 }
 
 .session-error-summary strong {
-  font-size: 13px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -696,7 +696,7 @@ select:focus {
   border: none;
   color: var(--danger);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .section {
@@ -731,13 +731,13 @@ select:focus {
   color: #fff;
   background: var(--group);
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .group-setting-label {
   color: #5d8f89;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.5px;
 }
 
@@ -746,7 +746,7 @@ select:focus {
   max-width: 120px;
   overflow: hidden;
   color: #115e59;
-  font-size: 13px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -761,7 +761,7 @@ select:focus {
   width: 118px;
   padding: 7px 8px;
   border-color: #9dd9ce;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .btn.group-save {
@@ -791,7 +791,7 @@ select:focus {
   align-items: center;
   gap: 6px;
   color: #7c4708;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -800,7 +800,7 @@ select:focus {
   color: #fff;
   background: var(--rake);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .rake-dot {
@@ -814,7 +814,7 @@ select:focus {
 .rake-setting-copy p {
   margin-top: 4px;
   color: #9a6a2b;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .rake-controls {
@@ -853,7 +853,7 @@ select:focus {
 .percent-input span {
   padding-right: 8px;
   color: var(--rake);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -900,13 +900,13 @@ select:focus {
 
 .final-rake-heading span:not(.final-rake-icon) {
   color: #568673;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.4px;
 }
 
 .final-rake-heading strong {
   color: #145a40;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .final-rake-icon {
@@ -918,7 +918,7 @@ select:focus {
   color: #fff;
   background: #16845b;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   box-shadow: 0 0 0 4px rgba(22, 132, 91, 0.1);
 }
@@ -926,7 +926,7 @@ select:focus {
 .final-rake-copy p {
   margin: 4px 0 0 37px;
   color: #5f7e70;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .final-rake-controls {
@@ -953,7 +953,7 @@ select:focus {
 .money-input span {
   padding-left: 9px;
   color: #16845b;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -1000,12 +1000,12 @@ select:focus {
 .input-row input {
   flex: 1;
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .input-row .btn {
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 15px;
   white-space: nowrap;
 }
 
@@ -1065,7 +1065,7 @@ select:focus {
 .player-history-icon {
   flex: 0 0 auto;
   color: var(--group);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .player-history-name {
@@ -1091,13 +1091,13 @@ select:focus {
 
 .stats-card .label {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   opacity: 0.8;
   margin-bottom: 2px;
 }
 
 .stats-card .value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
 }
 
@@ -1114,7 +1114,7 @@ select:focus {
 .rake-note {
   margin-top: 2px;
   color: var(--rake);
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -1128,7 +1128,7 @@ select:focus {
   text-align: center;
   color: var(--text-light);
   margin: 10px 0;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .settlement-note {
@@ -1136,7 +1136,7 @@ select:focus {
   padding-top: 9px;
   color: var(--rake);
   border-top: 1px dashed #efd39d;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1216,19 +1216,19 @@ select:focus {
 }
 
 .group-ledger-kicker {
-  font-size: 12px;
+  font-size: 14px;
   opacity: 0.78;
   letter-spacing: 1px;
 }
 
 .group-ledger-access {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 13px;
   opacity: 0.82;
 }
 
 .group-ledger-count {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
 }
 
@@ -1240,12 +1240,26 @@ select:focus {
   color: var(--group);
 }
 
+.group-session-stat .info {
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.group-session-stat .meta {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.group-session-stat .player-result {
+  flex: 0 0 auto;
+}
+
 .btn.pool-expense-add {
   padding: 7px 11px;
   color: #fff;
   background: var(--group);
   border-color: var(--group);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .expense-item .expense-note {
@@ -1263,7 +1277,7 @@ select:focus {
   padding: 8px 0;
   color: var(--group);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   list-style: none;
   user-select: none;
@@ -1287,7 +1301,7 @@ select:focus {
 .details-count {
   margin-left: auto;
   color: var(--text-light);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
 }
 
@@ -1335,14 +1349,14 @@ select:focus {
   margin-bottom: 12px;
   color: var(--text);
   text-transform: none;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .modal-content input,
 .modal-content select {
   margin-bottom: 12px;
   padding: 10px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .modal-field {
@@ -1353,7 +1367,7 @@ select:focus {
   display: block;
   margin-bottom: 6px;
   color: var(--text-light);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .modal-field .create-rake-input {
@@ -1369,7 +1383,7 @@ select:focus {
   display: block;
   margin-top: 5px;
   color: var(--rake);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .modal-field .group-help {
@@ -1379,7 +1393,7 @@ select:focus {
 .modal-tip {
   margin: -2px 0 14px;
   color: var(--text-light);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -1419,7 +1433,7 @@ select:focus {
 }
 
 .share-item .delete-btn {
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -1435,7 +1449,7 @@ select:focus {
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
   box-shadow: 0 10px 28px rgba(15, 118, 110, 0.28);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
@@ -1468,7 +1482,7 @@ select:focus {
   text-align: center;
   padding: 20px;
   color: var(--text-light);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .settled-badge {
@@ -1476,7 +1490,7 @@ select:focus {
   color: #fff;
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.3;
   margin-left: 5px;
 }
@@ -1486,7 +1500,7 @@ select:focus {
   color: #fff;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
   margin-left: 8px;
 }
 
@@ -1495,12 +1509,12 @@ select:focus {
 }
 
 .list.small .list-item .name {
-  font-size: 14px;
+  font-size: 16px;
   margin-bottom: 2px;
 }
 
 .list.small .list-item .meta {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* 买入弹窗玩家列表 */
@@ -1540,12 +1554,12 @@ select:focus {
 
 .buyin-player-item .player-buyin {
   color: var(--text-light);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .buyin-player-item .check {
   color: var(--primary);
-  font-size: 18px;
+  font-size: 20px;
 }
 
 @media (max-width: 480px) {
@@ -1559,14 +1573,14 @@ select:focus {
   }
 
   .create-session-hero h3 {
-    font-size: 19px;
+    font-size: 21px;
   }
 
   .create-session-mark {
     right: 17px;
     width: 60px;
     height: 78px;
-    font-size: 32px;
+    font-size: 34px;
   }
 
   .create-session-card {
@@ -1604,7 +1618,7 @@ select:focus {
   }
   
   h1 {
-    font-size: 24px;
+    font-size: 26px;
     margin-bottom: 24px;
   }
   
@@ -1639,7 +1653,7 @@ select:focus {
   }
   
   .stats-card .value {
-    font-size: 18px;
+    font-size: 20px;
   }
   
   .list-item {
@@ -1647,11 +1661,11 @@ select:focus {
   }
   
   .list-item .name {
-    font-size: 14px;
+    font-size: 16px;
   }
   
   .list-item .amount {
-    font-size: 15px;
+    font-size: 17px;
   }
 
   .rake-setting {

@@ -839,6 +839,9 @@ final class Application
                 'created_at' => (string) $sessionRow['created_at'],
                 'rakeRate' => (float) $sessionRow['rake_rate'],
                 'playerCount' => (int) $sessionRow['player_count'],
+                'playerNames' => array_map(function (array $player): string {
+                    return $player['name'];
+                }, $stats['players']),
                 'settledCount' => (int) $sessionRow['settled_count'],
                 'totalBuyins' => $stats['totalBuyins'],
                 'totalSettled' => $stats['totalSettled'],

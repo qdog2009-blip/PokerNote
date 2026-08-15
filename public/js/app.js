@@ -1143,18 +1143,24 @@ async function showGroupStats(groupId, navigate = true) {
 
     const sessionList = document.getElementById('group-session-list');
     sessionList.innerHTML = data.sessions.length > 0
-      ? data.sessions.map(session => `
+      ? data.sessions.map(session => {
+          const playerNames = Array.isArray(session.playerNames) ? session.playerNames : [];
+          const playerSummary = playerNames.length > 0
+            ? `${session.playerCount}人（${playerNames.map(name => escapeHtml(name)).join('，')}）`
+            : `${session.playerCount}人`;
+
+          return `
           <div class="list-item group-session-stat" onclick="openSession(${session.id})">
             <div class="info">
               <div class="name">${escapeHtml(session.name)}</div>
-              <div class="meta">${session.playerCount}人 · ${session.settledCount}人已结算 · ${session.isFullySettled ? `最终抽水 ${formatRake(session.totalRake)}` : `抽水 ${formatRate(session.rakeRate)}`}</div>
+              <div class="meta">${playerSummary}</div>
             </div>
             <div class="player-result">
-              <div class="amount">${formatMoney(session.totalNetSettled)}</div>
-              <div class="rake-note">水池 ${formatPool(session.waterPool)}</div>
+              <div class="amount">${formatPool(session.waterPool)}</div>
             </div>
           </div>
-        `).join('')
+        `;
+        }).join('')
       : '<div class="empty-state">该分组暂无场次</div>';
 
     const expenseList = document.getElementById('group-expense-list');
