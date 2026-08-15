@@ -650,6 +650,14 @@ select:focus {
   color: var(--success);
 }
 
+#group-player-list .player-win {
+  color: var(--danger);
+}
+
+#group-player-list .player-loss {
+  color: var(--success);
+}
+
 #players-list .settlement-breakdown {
   margin-top: 3px;
   color: var(--text-light);

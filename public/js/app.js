@@ -1178,20 +1178,23 @@ async function showGroupStats(groupId, navigate = true) {
           const grossResult = player.grossProfitLoss === null
             ? '待结算'
             : formatPoolAdjustment(player.grossProfitLoss);
+          const grossResultClass = player.grossProfitLoss === null
+            ? ''
+            : (player.grossProfitLoss >= 0 ? 'player-win' : 'player-loss');
           let profitText = '-';
           let profitClass = '';
           if (player.profitLoss !== null) {
             profitText = player.profitLoss >= 0
               ? `净水上${formatMoney(player.profitLoss)}`
               : `水下${formatMoney(Math.abs(player.profitLoss))}`;
-            profitClass = player.profitLoss >= 0 ? 'profit' : 'loss';
+            profitClass = player.profitLoss >= 0 ? 'player-win' : 'player-loss';
           }
 
           return `
             <div class="list-item">
               <div class="info">
                 <div class="name">${escapeHtml(player.name)}</div>
-                <div class="meta">参与${player.sessionCount}场，水上${player.winningSessionCount}场，总战绩${grossResult}</div>
+                <div class="meta">参与${player.sessionCount}场，水上${player.winningSessionCount}场，总战绩<span class="${grossResultClass}">${grossResult}</span></div>
               </div>
               <div class="player-result">
                 <div class="amount ${profitClass}">${profitText}</div>
