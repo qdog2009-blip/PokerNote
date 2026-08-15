@@ -864,6 +864,7 @@ final class Application
                         'sessionIds' => [],
                         'settledSessionIds' => [],
                         'winningSessionIds' => [],
+                        'sessionResults' => [],
                         'buyin' => 0.0,
                         'final' => 0.0,
                         'netFinal' => 0.0,
@@ -875,6 +876,20 @@ final class Application
 
                 $playerTotals[$name]['sessionIds'][$sessionId] = true;
                 $playerTotals[$name]['buyin'] += $player['buyin'];
+                $playerTotals[$name]['sessionResults'][] = [
+                    'sessionId' => $sessionId,
+                    'sessionName' => (string) $sessionRow['name'],
+                    'createdAt' => (string) $sessionRow['created_at'],
+                    'buyin' => round($player['buyin'], 2),
+                    'final' => $player['final'] === null ? null : round($player['final'], 2),
+                    'grossProfitLoss' => $player['grossProfitLoss'] === null
+                        ? null
+                        : round($player['grossProfitLoss'], 2),
+                    'rake' => $player['rake'] === null ? null : round($player['rake'], 2),
+                    'profitLoss' => $player['profitLoss'] === null
+                        ? null
+                        : round($player['profitLoss'], 2),
+                ];
                 if ($player['final'] !== null) {
                     $playerTotals[$name]['settledSessionIds'][$sessionId] = true;
                     $playerTotals[$name]['final'] += $player['final'];
@@ -898,6 +913,7 @@ final class Application
                 'sessionCount' => count($player['sessionIds']),
                 'settledSessionCount' => $settledSessionCount,
                 'winningSessionCount' => count($player['winningSessionIds']),
+                'sessions' => $player['sessionResults'],
                 'buyin' => round($player['buyin'], 2),
                 'final' => $hasSettlement ? round($player['final'], 2) : null,
                 'netFinal' => $hasSettlement ? round($player['netFinal'], 2) : null,

@@ -412,6 +412,24 @@
         </details>
       </div>
     </div>
+
+    <!-- 分组玩家场次成绩页 -->
+    <div id="page-group-player-history" class="page">
+      <header>
+        <button class="btn back" onclick="goBack()">← 返回</button>
+        <h2 id="group-player-history-title">玩家成绩</h2>
+      </header>
+      <div class="container">
+        <div class="group-ledger-card group-player-history-card">
+          <div>
+            <div class="group-ledger-kicker">所属分组</div>
+            <strong id="group-player-history-group">默认分组</strong>
+          </div>
+          <div class="group-ledger-count" id="group-player-history-count">0 场</div>
+        </div>
+        <div id="group-player-session-list" class="list"></div>
+      </div>
+    </div>
   </div>
   
   <!-- 创建分组弹窗 -->
@@ -444,6 +462,7 @@
         <button class="btn primary" onclick="createGroupPoolExpense()">确认支出</button>
       </div>
     </div>
+
   </div>
 
   <!-- 修改密码弹窗 -->

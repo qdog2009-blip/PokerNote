@@ -5,6 +5,7 @@ let groups = [];
 let currentSession = null;
 let currentSessionPlayers = [];
 let currentGroup = null;
+let currentGroupStats = null;
 let currentPlayer = null;
 let selectedBuyinPlayerId = null;
 let pageHistory = ['page-sessions'];
@@ -1125,6 +1126,7 @@ async function showGroupStats(groupId, navigate = true) {
   try {
     const data = await api('/groups/' + groupId + '/stats');
     currentGroup = data.group;
+    currentGroupStats = data;
     const editable = canInput(data.group.access_level);
     document.getElementById('btn-group-share').hidden = data.group.access_level !== 'owner';
     document.getElementById('btn-add-group-expense').hidden = !editable;
@@ -1180,7 +1182,7 @@ async function showGroupStats(groupId, navigate = true) {
 
     const playerList = document.getElementById('group-player-list');
     playerList.innerHTML = data.players.length > 0
-      ? data.players.map(player => {
+      ? data.players.map((player, playerIndex) => {
           const grossResult = player.grossProfitLoss === null
             ? '待结算'
             : formatPoolAdjustment(player.grossProfitLoss);
@@ -1199,7 +1201,7 @@ async function showGroupStats(groupId, navigate = true) {
           return `
             <div class="list-item">
               <div class="info">
-                <div class="name">${escapeHtml(player.name)}</div>
+                <button type="button" class="name group-player-name" onclick="showGroupPlayerHistory(${playerIndex})">${escapeHtml(player.name)}</button>
                 <div class="meta">参与${player.sessionCount}场，水上${player.winningSessionCount}场，总战绩<span class="${grossResultClass}">${grossResult}</span></div>
               </div>
               <div class="player-result">
@@ -1218,6 +1220,52 @@ async function showGroupStats(groupId, navigate = true) {
   } catch (err) {
     alert(err.message);
   }
+}
+
+function showGroupPlayerHistory(playerIndex) {
+  if (!currentGroupStats || !currentGroup) return;
+  const player = currentGroupStats.players[playerIndex];
+  if (!player) return;
+
+  const sessionResults = Array.isArray(player.sessions) ? player.sessions : [];
+  document.getElementById('group-player-history-title').textContent = player.name;
+  document.getElementById('group-player-history-group').textContent = currentGroup.name;
+  document.getElementById('group-player-history-count').textContent = sessionResults.length + ' 场';
+
+  const list = document.getElementById('group-player-session-list');
+  list.innerHTML = sessionResults.length > 0
+    ? sessionResults.map(result => {
+        const isSettled = result.profitLoss !== null;
+        const buyinMeta = `买入 ${formatMoney(result.buyin)}`;
+        let resultHtml = '<div class="amount">待结算</div>';
+        let settlementMeta = buyinMeta + ' · 待结算';
+
+        if (isSettled) {
+          const profitClass = result.profitLoss >= 0 ? 'player-win' : 'player-loss';
+          const profitText = result.profitLoss >= 0
+            ? `净水上${formatMoney(result.profitLoss)}`
+            : `水下${formatMoney(Math.abs(result.profitLoss))}`;
+          const grossLabel = result.grossProfitLoss >= 0 ? '赢' : '输';
+          settlementMeta = `${buyinMeta} · 结余 ${formatMoney(result.final)}`;
+          resultHtml = `
+            <div class="amount ${profitClass}">${profitText}</div>
+            <div class="settlement-breakdown">${grossLabel}：${formatMoney(Math.abs(result.grossProfitLoss))}，抽水：${formatRake(result.rake)}</div>
+          `;
+        }
+
+        return `
+          <div class="list-item" onclick="openSession(${result.sessionId})">
+            <div class="info">
+              <div class="name">${escapeHtml(result.sessionName)}</div>
+              <div class="meta">${settlementMeta}</div>
+            </div>
+            <div class="player-result">${resultHtml}</div>
+          </div>
+        `;
+      }).join('')
+    : '<div class="empty-state">暂无场次成绩</div>';
+
+  showPage('page-group-player-history');
 }
 
 function openGroupExpenseModal() {

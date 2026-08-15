@@ -549,6 +549,20 @@ try {
     assertTrue((int) ($rankedPlayers[0]['sessionCount'] ?? 0) === 2, 'Cumulative session count is incorrect');
     assertTrue((int) ($rankedPlayers[0]['winningSessionCount'] ?? 0) === 2, 'Winning session count is incorrect');
     assertTrue((float) ($rankedPlayers[0]['grossProfitLoss'] ?? -1) === 70.0, 'Pre-rake cumulative result is incorrect');
+    $winnerSessions = $rankedPlayers[0]['sessions'] ?? [];
+    assertTrue(count($winnerSessions) === 2, 'Cumulative player session history is incomplete');
+    assertTrue(
+        (int) ($winnerSessions[0]['sessionId'] ?? 0) === $rankingSessionId,
+        'Cumulative player sessions are not ordered newest first'
+    );
+    assertTrue(
+        (float) ($winnerSessions[0]['buyin'] ?? -1) === 100.0
+        && (float) ($winnerSessions[0]['final'] ?? -1) === 120.0
+        && (float) ($winnerSessions[0]['grossProfitLoss'] ?? -1) === 20.0
+        && (float) ($winnerSessions[0]['rake'] ?? -1) === 0.0
+        && (float) ($winnerSessions[0]['profitLoss'] ?? -1) === 20.0,
+        'Cumulative player session result is incorrect'
+    );
     for ($playerIndex = 1; $playerIndex < count($rankedPlayers); $playerIndex++) {
         assertTrue(
             (int) $rankedPlayers[$playerIndex - 1]['sessionCount'] >= (int) $rankedPlayers[$playerIndex]['sessionCount'],
