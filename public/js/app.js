@@ -33,16 +33,41 @@ async function api(path, options = {}) {
     ...options,
     headers
   });
-  const data = await res.json();
+  let responseText;
+  try {
+    responseText = await res.text();
+  } catch (error) {
+    const responseError = new Error('无法读取服务器响应，请稍后重试');
+    responseError.status = res.status;
+    throw responseError;
+  }
+
+  let data = null;
+  if (responseText.trim() !== '') {
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      // Nginx/PHP 异常时可能返回 HTML 或被截断的内容，不把浏览器的 JSON 解析错误直接展示给用户。
+    }
+  }
+
   if (!res.ok) {
     if (res.status === 401 && path !== '/login') {
       clearAuthToken();
       currentUser = null;
       if (path !== '/me') showPage('page-login');
     }
-    const error = new Error(data.error || '请求失败');
+    const serverMessage = data && typeof data.error === 'string' ? data.error.trim() : '';
+    const fallbackMessage = res.status >= 500
+      ? '服务器暂时无法处理请求，请稍后重试'
+      : `服务器响应异常（HTTP ${res.status}），请稍后重试`;
+    const error = new Error(serverMessage || fallbackMessage);
     error.status = res.status;
     throw error;
+  }
+
+  if (data === null || typeof data !== 'object') {
+    throw new Error('服务器返回了无法识别的响应，请稍后重试');
   }
   return data;
 }
@@ -1016,15 +1041,32 @@ async function loadPlayerDetail() {
   
   // 显示买入记录
   const list = document.getElementById('buyins-list');
+  const editable = currentSession && canInput(currentSession.accessLevel);
   list.innerHTML = buyins.map((b, i) => `
     <div class="list-item small">
       <div class="info">
         <div class="name">第 ${i + 1} 次买入</div>
         <div class="meta">${new Date(b.created_at).toLocaleString()}</div>
       </div>
-      <span class="amount">${formatMoney(b.amount)}</span>
+      <div class="buyin-record-actions">
+        <span class="amount">${formatMoney(b.amount)}</span>
+        ${editable ? `<button class="delete-btn" onclick="deleteBuyin(${b.id})" aria-label="删除第 ${i + 1} 次买入">🗑️</button>` : ''}
+      </div>
     </div>
   `).join('') || '<div class="empty-state">暂无买入记录</div>';
+}
+
+async function deleteBuyin(buyinId) {
+  if (!currentPlayer || !confirm('确定删除这笔买入记录？')) return;
+
+  try {
+    await api('/buyins/' + buyinId, { method: 'DELETE' });
+    await loadPlayers();
+    await loadPlayerDetail();
+    await loadSessions();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function addBuyin() {

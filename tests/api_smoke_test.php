@@ -442,6 +442,67 @@ try {
     assertTrue((float) ($sessionWithFinalRake['body']['water_pool_adjustment'] ?? -1) === 10.0, 'Session detail omits the pool error adjustment');
     assertTrue(($sessionWithFinalRake['body']['is_fully_settled'] ?? false) === true, 'Session detail is missing completion state');
 
+    $additionalBuyin = request(
+        'POST',
+        $baseUrl . '/api/players/' . $winnerId . '/buyin',
+        ['amount' => 20],
+        $authenticatedCookie
+    );
+    assertTrue($additionalBuyin['status'] === 200, 'Unable to add a buy-in for deletion testing');
+    $winnerBuyins = request('GET', $baseUrl . '/api/players/' . $winnerId . '/buyins', null, $authenticatedCookie);
+    assertTrue($winnerBuyins['status'] === 200 && count($winnerBuyins['body']) === 2, 'Buy-in list is incomplete');
+    $winnerInitialBuyinId = (int) ($winnerBuyins['body'][0]['id'] ?? 0);
+    $additionalBuyinId = (int) ($winnerBuyins['body'][1]['id'] ?? 0);
+
+    $temporaryFinalPool = request(
+        'PATCH',
+        $baseUrl . '/api/sessions/' . $sessionId,
+        ['finalPool' => 38],
+        $authenticatedCookie
+    );
+    assertTrue(
+        $temporaryFinalPool['status'] === 200
+        && (float) ($temporaryFinalPool['body']['finalRake'] ?? -1) === 8.0,
+        'Unable to prepare a manual pool amount for buy-in deletion testing'
+    );
+
+    $deletedBuyin = request(
+        'DELETE',
+        $baseUrl . '/api/buyins/' . $additionalBuyinId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($deletedBuyin['status'] === 200, 'Unable to delete a buy-in');
+    assertTrue((float) ($deletedBuyin['body']['totalBuyin'] ?? -1) === 100.0, 'Deleting a buy-in returned the wrong total');
+    $buyinsAfterDelete = request('GET', $baseUrl . '/api/players/' . $winnerId . '/buyins', null, $authenticatedCookie);
+    assertTrue(count($buyinsAfterDelete['body']) === 1, 'Deleted buy-in remains in the list');
+    assertTrue((int) ($buyinsAfterDelete['body'][0]['id'] ?? 0) === $winnerInitialBuyinId, 'Deleting a buy-in removed the wrong record');
+
+    $sessionAfterBuyinDelete = request('GET', $baseUrl . '/api/sessions/' . $sessionId, null, $authenticatedCookie);
+    $winnerAfterBuyinDelete = null;
+    foreach ($sessionAfterBuyinDelete['body']['players'] ?? [] as $playerAfterBuyinDelete) {
+        if ((int) ($playerAfterBuyinDelete['id'] ?? 0) === $winnerId) {
+            $winnerAfterBuyinDelete = $playerAfterBuyinDelete;
+            break;
+        }
+    }
+    assertTrue(is_array($winnerAfterBuyinDelete), 'Winner disappeared after deleting a buy-in');
+    assertTrue((float) ($winnerAfterBuyinDelete['total_buyin'] ?? -1) === 100.0, 'Player total was not updated after deleting a buy-in');
+    assertTrue((float) ($winnerAfterBuyinDelete['total_buyin_recorded'] ?? -1) === 100.0, 'Recorded total was not updated after deleting a buy-in');
+    assertTrue(
+        array_key_exists('final_rake', $sessionAfterBuyinDelete['body'])
+        && $sessionAfterBuyinDelete['body']['final_rake'] === null,
+        'Deleting a buy-in did not clear the manual pool amount'
+    );
+
+    $duplicateBuyinDelete = request(
+        'DELETE',
+        $baseUrl . '/api/buyins/' . $additionalBuyinId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($duplicateBuyinDelete['status'] === 404, 'Deleting a missing buy-in did not return 404');
+
     $decimalFinalRake = request(
         'PATCH',
         $baseUrl . '/api/sessions/' . $sessionId,
@@ -659,6 +720,13 @@ try {
     assertTrue($viewerWrite['status'] === 403, 'View permission allowed a pool expense');
     $viewerDelete = request('DELETE', $baseUrl . '/api/sessions/' . $sessionId, null, $otherCookie);
     assertTrue($viewerDelete['status'] === 403, 'View permission allowed deleting a session');
+    $viewerBuyinDelete = request(
+        'DELETE',
+        $baseUrl . '/api/buyins/' . $winnerInitialBuyinId,
+        null,
+        $otherCookie
+    );
+    assertTrue($viewerBuyinDelete['status'] === 403, 'View permission allowed deleting a buy-in');
 
     $inputShare = request(
         'POST',
@@ -695,6 +763,22 @@ try {
         $otherCookie
     );
     assertTrue($inputPlayer['status'] === 200, 'Input permission cannot add a player');
+    $inputPlayerId = (int) ($inputPlayer['body']['playerId'] ?? 0);
+    $inputPlayerBuyins = request(
+        'GET',
+        $baseUrl . '/api/players/' . $inputPlayerId . '/buyins',
+        null,
+        $otherCookie
+    );
+    $inputPlayerBuyinId = (int) ($inputPlayerBuyins['body'][0]['id'] ?? 0);
+    $inputBuyinDelete = request(
+        'DELETE',
+        $baseUrl . '/api/buyins/' . $inputPlayerBuyinId,
+        null,
+        $otherCookie
+    );
+    assertTrue($inputBuyinDelete['status'] === 200, 'Input permission cannot delete a buy-in');
+    assertTrue((float) ($inputBuyinDelete['body']['totalBuyin'] ?? -1) === 0.0, 'Deleting an initial buy-in did not reset the total');
 
     $inputSession = request(
         'POST',

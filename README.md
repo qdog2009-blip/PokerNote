@@ -96,7 +96,7 @@ PHP 进程必须对项目根目录具有写权限，以便创建和更新 `toolb
 
 - 域名：`p.txtcc.com`
 - 证书：`ssl/star.txtcc.com.cer`、`ssl/star.txtcc.com.key`
-- 网站目录：`/serverdata/wwwroot/nick/PokerNote/public`
+- 网站目录：`/serverdata/wwwroot/PokerNote/public`
 - PHP 配置：`php7.inc`
 - 公共配置：`common.inc`
 
@@ -108,7 +108,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-该模式不需要运行 `php -S 127.0.0.1:3000`。Nginx 会直接提供 CSS、JavaScript 和字体文件，页面入口与 `/api` 请求由 `public/index.php` 交给 PHP-FPM。PHP-FPM 的运行用户需要对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
+该模式不需要运行 `php -S 127.0.0.1:3000`。Nginx 会直接提供 CSS、JavaScript 和字体文件，页面入口与 `/api` 请求由 `public/index.php` 交给 PHP-FPM。配置中单独声明了 `location = /index.php` 并关闭错误页拦截，确保 API 的 JSON 错误信息不会被公用配置替换为 HTML；公用的 `php7.inc` 和 `common.inc` 无需修改。PHP-FPM 的运行用户需要对项目根目录具有写权限，以便创建和更新 `toolbox.db`。
 
 页面入口会自动对 CSS、JavaScript 和字体内容计算 SHA-256 短哈希，并把哈希加入资源 URL。静态文件仍可保留长期缓存，但文件内容一旦变化，浏览器会自动请求新 URL，不需要每次发布手工修改版本号。部署旧版本配置的站点需要同步更新 `deploy/nginx/pokernote.conf`，确保 `index.php` 排在 `index.html` 前面；无需修改公用的 `php7.inc` 或 `common.inc`。
 

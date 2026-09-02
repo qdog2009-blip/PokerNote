@@ -37,7 +37,10 @@ final class Application
             $this->json(['error' => $exception->getMessage()], $exception->getStatusCode());
         } catch (Throwable $exception) {
             error_log((string) $exception);
-            $this->json(['error' => '服务器内部错误'], 500);
+            $errorMessage = $this->isStorageFullException($exception)
+                ? '服务器存储空间不足，请联系管理员清理磁盘后重试'
+                : '服务器内部错误';
+            $this->json(['error' => $errorMessage], 500);
         }
     }
 
@@ -143,6 +146,10 @@ final class Application
 
         if (preg_match('#^/api/players/(\d+)/buyins$#', $path, $matches) === 1 && $method === 'GET') {
             $this->listBuyins((int) $matches[1], $this->requireUser());
+        }
+
+        if (preg_match('#^/api/buyins/(\d+)$#', $path, $matches) === 1 && $method === 'DELETE') {
+            $this->deleteBuyin((int) $matches[1], $this->requireUser());
         }
 
         if (preg_match('#^/api/players/(\d+)/settle$#', $path, $matches) === 1 && $method === 'POST') {
@@ -772,6 +779,64 @@ final class Application
             $buyins[] = $row;
         }
         $this->json($buyins);
+    }
+
+    private function deleteBuyin(int $buyinId, int $userId): void
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT b.id, b.player_id, b.amount, p.session_id
+             FROM buyins b
+             INNER JOIN players p ON p.id = b.player_id
+             WHERE b.id = ?'
+        );
+        $statement->execute([$buyinId]);
+        $buyin = $statement->fetch();
+        if ($buyin === false) {
+            throw new HttpException(404, '买入记录不存在');
+        }
+
+        $playerId = (int) $buyin['player_id'];
+        $sessionId = (int) $buyin['session_id'];
+        $this->accessiblePlayer($playerId, $userId, 'input');
+
+        $statement = $this->pdo->prepare(
+            'SELECT id FROM buyins WHERE player_id = ? ORDER BY created_at ASC, id ASC LIMIT 1'
+        );
+        $statement->execute([$playerId]);
+        $isInitialBuyin = (int) $statement->fetchColumn() === $buyinId;
+        $totalBuyin = 0.0;
+
+        $this->transaction(function () use (
+            $buyinId,
+            $playerId,
+            $sessionId,
+            $isInitialBuyin,
+            &$totalBuyin
+        ): void {
+            $this->clearFinalRake($sessionId);
+            $statement = $this->pdo->prepare('DELETE FROM buyins WHERE id = ?');
+            $statement->execute([$buyinId]);
+
+            $statement = $this->pdo->prepare(
+                'SELECT COALESCE(SUM(amount), 0) FROM buyins WHERE player_id = ?'
+            );
+            $statement->execute([$playerId]);
+            $totalBuyin = round((float) $statement->fetchColumn(), 2);
+
+            $statement = $this->pdo->prepare(
+                'UPDATE players
+                 SET total_buyin = ?,
+                     initial_buyin = CASE WHEN ? = 1 THEN 0 ELSE initial_buyin END
+                 WHERE id = ?'
+            );
+            $statement->execute([$totalBuyin, $isInitialBuyin ? 1 : 0, $playerId]);
+        });
+
+        $this->json([
+            'success' => true,
+            'playerId' => $playerId,
+            'totalBuyin' => $totalBuyin,
+        ]);
     }
 
     private function settlePlayer(int $playerId, int $userId): void
@@ -1457,10 +1522,32 @@ final class Application
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
+                try {
+                    $this->pdo->rollBack();
+                } catch (Throwable $rollbackException) {
+                    // SQLite 可能在磁盘写满时自行终止事务；回滚错误不能覆盖最初的数据库异常。
+                    error_log('Transaction rollback failed: ' . (string) $rollbackException);
+                }
             }
             throw $exception;
         }
+    }
+
+    private function isStorageFullException(Throwable $exception): bool
+    {
+        do {
+            $message = strtolower($exception->getMessage());
+            if (
+                strpos($message, 'database or disk is full') !== false
+                || strpos($message, 'disk full') !== false
+                || strpos($message, 'no space left on device') !== false
+            ) {
+                return true;
+            }
+            $exception = $exception->getPrevious();
+        } while ($exception !== null);
+
+        return false;
     }
 
     private function json(array $payload, int $statusCode = 200): void

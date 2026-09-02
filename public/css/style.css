@@ -796,6 +796,12 @@ select:focus {
   font-size: 20px;
 }
 
+.buyin-record-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .section {
   margin-top: 12px;
 }
