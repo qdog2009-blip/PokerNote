@@ -190,6 +190,17 @@
           </div>
         </div>
 
+        <div class="session-expense-setting" id="session-expense-entry" hidden>
+          <div class="session-expense-copy">
+            <span class="session-expense-icon" aria-hidden="true">−¥</span>
+            <div>
+              <strong>分组水池支出</strong>
+              <p>默认关联本场，也可以改为不关联</p>
+            </div>
+          </div>
+          <button class="btn session-expense-add" onclick="openSessionExpenseModal()">+ 记支出</button>
+        </div>
+
         <div class="final-rake-setting" id="session-final-rake-setting" hidden>
           <div class="final-rake-copy">
             <div class="final-rake-heading">
@@ -445,6 +456,7 @@
   <div id="modal-group-expense" class="modal">
     <div class="modal-content">
       <h3>添加水池支出</h3>
+      <p id="group-expense-context" class="modal-tip expense-context"></p>
       <div class="modal-field">
         <label for="group-expense-amount">支出金额</label>
         <input type="number" id="group-expense-amount" min="0.01" step="0.01" inputmode="decimal" placeholder="输入金额">
@@ -452,6 +464,17 @@
       <div class="modal-field">
         <label for="group-expense-note">备注</label>
         <input type="text" id="group-expense-note" maxlength="200" placeholder="如：场地费、饮料费">
+      </div>
+      <div id="group-expense-session-field" class="modal-field expense-session-field" hidden>
+        <span class="modal-field-label">关联场次</span>
+        <label class="expense-session-option" for="group-expense-link-session">
+          <input type="checkbox" id="group-expense-link-session" checked>
+          <span class="expense-session-check" aria-hidden="true">✓</span>
+          <span class="expense-session-copy">
+            <strong id="group-expense-session-name">当前场次</strong>
+            <small>取消勾选后，只计入分组水池支出</small>
+          </span>
+        </label>
       </div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal('modal-group-expense')">取消</button>

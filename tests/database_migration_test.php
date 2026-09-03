@@ -47,6 +47,14 @@ try {
             amount REAL NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (player_id) REFERENCES players(id)
+        );
+        CREATE TABLE group_pool_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            amount REAL NOT NULL CHECK (amount > 0),
+            note TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (group_id) REFERENCES session_groups(id)
         )'
     );
     $legacy->exec(
@@ -80,6 +88,28 @@ try {
     )->fetch();
     if ($expenseTable === false) {
         throw new RuntimeException('The group pool expense table was not created during migration');
+    }
+    $expenseColumns = $migrated->query('PRAGMA table_info(group_pool_expenses)')->fetchAll();
+    $expenseSessionColumn = null;
+    foreach ($expenseColumns as $expenseColumn) {
+        if ($expenseColumn['name'] === 'session_id') {
+            $expenseSessionColumn = $expenseColumn;
+            break;
+        }
+    }
+    if ($expenseSessionColumn === null || (int) $expenseSessionColumn['notnull'] !== 0) {
+        throw new RuntimeException('Pool expenses did not receive an optional session association');
+    }
+    $expenseIndexes = $migrated->query('PRAGMA index_list(group_pool_expenses)')->fetchAll();
+    $hasExpenseSessionIndex = false;
+    foreach ($expenseIndexes as $expenseIndex) {
+        if ($expenseIndex['name'] === 'idx_group_pool_expenses_session_id') {
+            $hasExpenseSessionIndex = true;
+            break;
+        }
+    }
+    if (!$hasExpenseSessionIndex) {
+        throw new RuntimeException('The pool expense session index was not created');
     }
     $shareTable = $migrated->query(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'group_shares'"

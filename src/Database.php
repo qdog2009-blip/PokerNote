@@ -99,16 +99,24 @@ final class Database
             'CREATE TABLE IF NOT EXISTS group_pool_expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 group_id INTEGER NOT NULL,
+                session_id INTEGER,
                 amount REAL NOT NULL CHECK (amount > 0),
                 note TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (group_id) REFERENCES session_groups(id)
+                FOREIGN KEY (group_id) REFERENCES session_groups(id),
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
             )'
         );
 
         self::addColumnIfMissing($pdo, 'sessions', 'rake_rate', 'REAL NOT NULL DEFAULT 0');
         self::addColumnIfMissing($pdo, 'sessions', 'final_rake', 'REAL');
         self::addColumnIfMissing($pdo, 'sessions', 'group_id', 'INTEGER');
+        self::addColumnIfMissing(
+            $pdo,
+            'group_pool_expenses',
+            'session_id',
+            'INTEGER REFERENCES sessions(id) ON DELETE SET NULL'
+        );
         self::ensureDefaultGroups($pdo);
 
         $pdo->exec(
@@ -141,6 +149,7 @@ final class Database
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_group_shares_group_id ON group_shares(group_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_group_shares_user_id ON group_shares(shared_user_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_group_pool_expenses_group_id ON group_pool_expenses(group_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_group_pool_expenses_session_id ON group_pool_expenses(session_id)');
         $pdo->exec(
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_session_groups_default
              ON session_groups(user_id) WHERE is_default = 1'

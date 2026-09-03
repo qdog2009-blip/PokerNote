@@ -973,6 +973,70 @@ select:focus {
   border-color: var(--rake);
 }
 
+.session-expense-setting {
+  margin-top: 8px;
+  padding: 11px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(135deg, #fff8f6, #fffdfc);
+  border: 1px solid #efc4ba;
+  border-radius: 10px;
+}
+
+.session-expense-copy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.session-expense-copy > div {
+  min-width: 0;
+}
+
+.session-expense-copy strong {
+  display: block;
+  color: #8f382d;
+  font-size: 15px;
+}
+
+.session-expense-copy p {
+  margin-top: 3px;
+  color: #a5635a;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.session-expense-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  color: #fff;
+  background: #b64b3d;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.btn.session-expense-add {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  color: #983e32;
+  background: #fff;
+  border-color: #e6ad9f;
+}
+
+.btn.session-expense-add:hover {
+  color: #fff;
+  background: #b64b3d;
+  border-color: #b64b3d;
+}
+
 .final-rake-setting {
   margin-top: 8px;
   padding: 12px;
@@ -1379,6 +1443,25 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.expense-item .info {
+  min-width: 0;
+}
+
+.expense-session-tag {
+  display: inline-block;
+  max-width: calc(100% - 6px);
+  margin-left: 6px;
+  padding: 1px 6px;
+  overflow: hidden;
+  color: #0f766e;
+  background: #ecfdf5;
+  border-radius: 999px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .expense-item .amount {
   color: var(--danger);
 }
@@ -1481,6 +1564,87 @@ select:focus {
   margin-bottom: 6px;
   color: var(--text-light);
   font-size: 15px;
+}
+
+.modal-field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-light);
+  font-size: 15px;
+}
+
+.expense-context {
+  margin-bottom: 12px;
+}
+
+.expense-session-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 11px;
+  color: inherit;
+  background: #f3fbf9;
+  border: 1px solid #b9e2da;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.modal-content .expense-session-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.expense-session-check {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 23px;
+  color: transparent;
+  background: #fff;
+  border: 1px solid #92cec2;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.expense-session-option input:checked + .expense-session-check {
+  color: #fff;
+  background: var(--group);
+  border-color: var(--group);
+}
+
+.expense-session-option input:focus-visible + .expense-session-check {
+  outline: 2px solid rgba(15, 118, 110, 0.3);
+  outline-offset: 2px;
+}
+
+.expense-session-copy {
+  min-width: 0;
+}
+
+.expense-session-copy strong,
+.expense-session-copy small {
+  display: block;
+}
+
+.expense-session-copy strong {
+  overflow: hidden;
+  color: #115e59;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expense-session-copy small {
+  margin-top: 2px;
+  color: #5d8f89;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .modal-field .create-rake-input {

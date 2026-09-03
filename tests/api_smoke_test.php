@@ -140,6 +140,8 @@ try {
     assertTrue(strpos((string) $root, '/js/app.js?v=' . $appVersion) !== false, 'The app shell has a stale JavaScript version');
     assertTrue(strpos((string) $root, '/fonts/NotoSansSC.ttf?v=' . $fontVersion) !== false, 'The app shell has a stale font version');
     assertTrue(strpos((string) $root, '__STYLE_VERSION__') === false, 'The app shell contains an unresolved asset placeholder');
+    assertTrue(strpos((string) $root, 'id="session-expense-entry"') !== false, 'The session expense entry is missing');
+    assertTrue(strpos((string) $root, 'id="group-expense-link-session"') !== false, 'The optional session link control is missing');
     $cacheHeaders = array_filter($rootResponseHeaders, function (string $header): bool {
         return stripos($header, 'Cache-Control:') === 0;
     });
@@ -324,6 +326,13 @@ try {
         $authenticatedCookie
     );
     assertTrue($occupiedGroupDelete['status'] === 400, 'A group containing a session was deleted');
+    $mismatchedExpense = request(
+        'POST',
+        $baseUrl . '/api/groups/' . $groupId . '/expenses',
+        ['amount' => 1, 'note' => '不应保存', 'sessionId' => $occupiedSessionId],
+        $authenticatedCookie
+    );
+    assertTrue($mismatchedExpense['status'] === 400, 'An expense was linked to a session from another group');
     $occupiedSessionDelete = request(
         'DELETE',
         $baseUrl . '/api/sessions/' . $occupiedSessionId,
@@ -631,6 +640,15 @@ try {
         );
     }
 
+    $rankingExpense = request(
+        'POST',
+        $baseUrl . '/api/groups/' . $groupId . '/expenses',
+        ['amount' => 1, 'note' => '随场次解除关联测试', 'sessionId' => $rankingSessionId],
+        $authenticatedCookie
+    );
+    assertTrue($rankingExpense['status'] === 200, 'Unable to create the expense used for session deletion testing');
+    $rankingExpenseId = (int) ($rankingExpense['body']['expense']['id'] ?? 0);
+
     $rankingSessionDelete = request(
         'DELETE',
         $baseUrl . '/api/sessions/' . $rankingSessionId,
@@ -638,6 +656,29 @@ try {
         $authenticatedCookie
     );
     assertTrue($rankingSessionDelete['status'] === 200, 'Unable to remove the player-ranking test session');
+
+    $statsAfterLinkedSessionDelete = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
+    $detachedExpense = null;
+    foreach ($statsAfterLinkedSessionDelete['body']['expenses'] ?? [] as $expenseAfterSessionDelete) {
+        if ((int) ($expenseAfterSessionDelete['id'] ?? 0) === $rankingExpenseId) {
+            $detachedExpense = $expenseAfterSessionDelete;
+            break;
+        }
+    }
+    assertTrue(is_array($detachedExpense), 'Deleting a session also deleted its linked group expense');
+    assertTrue(
+        array_key_exists('session_id', $detachedExpense)
+        && $detachedExpense['session_id'] === null
+        && $detachedExpense['session_name'] === null,
+        'Deleting a session did not detach its linked group expense'
+    );
+    $deleteDetachedExpense = request(
+        'DELETE',
+        $baseUrl . '/api/group-expenses/' . $rankingExpenseId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($deleteDetachedExpense['status'] === 200, 'Unable to clean up the detached group expense');
 
     $groupStats = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($groupStats['body']['totalRake'] ?? -1) === 7.0, 'Group stats ignored the manual final rake');
@@ -656,6 +697,44 @@ try {
     $expenseId = (int) ($expense['body']['expense']['id'] ?? 0);
     assertTrue((float) ($expense['body']['expense']['amount'] ?? 0) === 3.25, 'Pool expense amount was not saved');
     assertTrue(($expense['body']['expense']['note'] ?? null) === '场地费', 'Pool expense note was not saved');
+    assertTrue(
+        array_key_exists('session_id', $expense['body']['expense'])
+        && $expense['body']['expense']['session_id'] === null,
+        'An unlinked pool expense was unexpectedly associated with a session'
+    );
+
+    $linkedExpense = request(
+        'POST',
+        $baseUrl . '/api/groups/' . $groupId . '/expenses',
+        ['amount' => 1.75, 'note' => '水池误差测试', 'sessionId' => $sessionId],
+        $authenticatedCookie
+    );
+    assertTrue($linkedExpense['status'] === 200, 'Unable to create a session-linked pool expense');
+    $linkedExpenseId = (int) ($linkedExpense['body']['expense']['id'] ?? 0);
+    assertTrue(
+        (int) ($linkedExpense['body']['expense']['session_id'] ?? 0) === $sessionId,
+        'The pool expense was not associated with its session'
+    );
+    assertTrue(
+        ($linkedExpense['body']['expense']['session_name'] ?? null) === '水池误差测试',
+        'The linked pool expense is missing its session name'
+    );
+
+    $statsWithLinkedExpense = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
+    assertTrue((float) ($statsWithLinkedExpense['body']['totalPoolExpenses'] ?? 0) === 5.0, 'Linked expense was not included in the group total');
+    assertTrue((float) ($statsWithLinkedExpense['body']['waterPool'] ?? 1) === -8.0, 'Linked expense was not deducted from the group pool');
+    assertTrue(
+        (int) ($statsWithLinkedExpense['body']['expenses'][0]['session_id'] ?? 0) === $sessionId,
+        'Group stats lost the expense session association'
+    );
+
+    $deleteLinkedExpense = request(
+        'DELETE',
+        $baseUrl . '/api/group-expenses/' . $linkedExpenseId,
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($deleteLinkedExpense['status'] === 200, 'Unable to delete a linked pool expense');
 
     $statsWithExpense = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);
     assertTrue((float) ($statsWithExpense['body']['grossWaterPool'] ?? 1) === -3.0, 'An expense changed the gross water pool');
@@ -750,11 +829,15 @@ try {
     $inputExpense = request(
         'POST',
         $baseUrl . '/api/groups/' . $groupId . '/expenses',
-        ['amount' => 2, 'note' => '录入用户支出'],
+        ['amount' => 2, 'note' => '录入用户支出', 'sessionId' => $sessionId],
         $otherCookie
     );
     assertTrue($inputExpense['status'] === 200, 'Input permission cannot create a pool expense');
     $inputExpenseId = (int) ($inputExpense['body']['expense']['id'] ?? 0);
+    assertTrue(
+        (int) ($inputExpense['body']['expense']['session_id'] ?? 0) === $sessionId,
+        'Input permission could not associate an expense with a shared session'
+    );
 
     $inputPlayer = request(
         'POST',

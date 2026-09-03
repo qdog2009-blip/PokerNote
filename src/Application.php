@@ -602,6 +602,7 @@ final class Application
         $body = $this->requestBody();
         $updates = [];
         $params = [];
+        $targetGroupId = null;
 
         if (array_key_exists('rakeRate', $body)) {
             $updates[] = 'rake_rate = ?';
@@ -649,6 +650,7 @@ final class Application
             $this->accessibleGroup($groupId, $userId, 'input');
             $updates[] = 'group_id = ?';
             $params[] = $groupId;
+            $targetGroupId = $groupId;
         }
 
         if (count($updates) === 0) {
@@ -656,10 +658,19 @@ final class Application
         }
 
         $params[] = $sessionId;
-        $statement = $this->pdo->prepare(
-            'UPDATE sessions SET ' . implode(', ', $updates) . ' WHERE id = ?'
-        );
-        $statement->execute($params);
+        $this->transaction(function () use ($updates, $params, $sessionId, $targetGroupId): void {
+            $statement = $this->pdo->prepare(
+                'UPDATE sessions SET ' . implode(', ', $updates) . ' WHERE id = ?'
+            );
+            $statement->execute($params);
+
+            if ($targetGroupId !== null) {
+                $statement = $this->pdo->prepare(
+                    'UPDATE group_pool_expenses SET group_id = ? WHERE session_id = ?'
+                );
+                $statement->execute([$targetGroupId, $sessionId]);
+            }
+        });
 
         $session = $this->castSession($this->accessibleSession($sessionId, $userId, 'view'));
         $stats = $this->calculateSessionStats(
@@ -682,6 +693,11 @@ final class Application
     {
         $this->accessibleSession($sessionId, $userId, 'input');
         $this->transaction(function () use ($sessionId): void {
+            $statement = $this->pdo->prepare(
+                'UPDATE group_pool_expenses SET session_id = NULL WHERE session_id = ?'
+            );
+            $statement->execute([$sessionId]);
+
             $statement = $this->pdo->prepare(
                 'DELETE FROM buyins WHERE player_id IN (SELECT id FROM players WHERE session_id = ?)'
             );
@@ -1001,10 +1017,12 @@ final class Application
         });
 
         $expenseStatement = $this->pdo->prepare(
-            'SELECT id, group_id, amount, note, created_at
-             FROM group_pool_expenses
-             WHERE group_id = ?
-             ORDER BY created_at DESC, id DESC'
+            'SELECT e.id, e.group_id, e.session_id, e.amount, e.note, e.created_at,
+                    s.name AS session_name
+             FROM group_pool_expenses e
+             LEFT JOIN sessions s ON s.id = e.session_id
+             WHERE e.group_id = ?
+             ORDER BY e.created_at DESC, e.id DESC'
         );
         $expenseStatement->execute([$groupId]);
         $expenses = [];
@@ -1012,6 +1030,7 @@ final class Application
         foreach ($expenseStatement->fetchAll() as $expense) {
             $expense['id'] = (int) $expense['id'];
             $expense['group_id'] = (int) $expense['group_id'];
+            $expense['session_id'] = $expense['session_id'] === null ? null : (int) $expense['session_id'];
             $expense['amount'] = (float) $expense['amount'];
             $totalPoolExpenses += $expense['amount'];
             $expenses[] = $expense;
@@ -1052,14 +1071,31 @@ final class Application
             throw new HttpException(400, '支出备注不能超过200个字符');
         }
 
+        $sessionId = null;
+        if (
+            array_key_exists('sessionId', $body)
+            && $body['sessionId'] !== null
+            && $body['sessionId'] !== ''
+        ) {
+            $sessionId = $this->positiveInteger($body, 'sessionId', '关联场次');
+            $session = $this->accessibleSession($sessionId, $userId, 'input');
+            if ((int) $session['group_id'] !== $groupId) {
+                throw new HttpException(400, '关联场次不属于当前分组');
+            }
+        }
+
         $statement = $this->pdo->prepare(
-            'INSERT INTO group_pool_expenses (group_id, amount, note) VALUES (?, ?, ?)'
+            'INSERT INTO group_pool_expenses (group_id, session_id, amount, note) VALUES (?, ?, ?, ?)'
         );
-        $statement->execute([$groupId, $amount, $note]);
+        $statement->execute([$groupId, $sessionId, $amount, $note]);
         $expenseId = (int) $this->pdo->lastInsertId();
 
         $statement = $this->pdo->prepare(
-            'SELECT id, group_id, amount, note, created_at FROM group_pool_expenses WHERE id = ?'
+            'SELECT e.id, e.group_id, e.session_id, e.amount, e.note, e.created_at,
+                    s.name AS session_name
+             FROM group_pool_expenses e
+             LEFT JOIN sessions s ON s.id = e.session_id
+             WHERE e.id = ?'
         );
         $statement->execute([$expenseId]);
         $expense = $statement->fetch();
@@ -1068,6 +1104,7 @@ final class Application
         }
         $expense['id'] = (int) $expense['id'];
         $expense['group_id'] = (int) $expense['group_id'];
+        $expense['session_id'] = $expense['session_id'] === null ? null : (int) $expense['session_id'];
         $expense['amount'] = (float) $expense['amount'];
 
         $this->json(['success' => true, 'expense' => $expense]);

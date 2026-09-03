@@ -6,6 +6,7 @@ let currentSession = null;
 let currentSessionPlayers = [];
 let currentGroup = null;
 let currentGroupStats = null;
+let groupExpenseContext = null;
 let currentPlayer = null;
 let selectedBuyinPlayerId = null;
 let pageHistory = ['page-sessions'];
@@ -726,6 +727,7 @@ async function loadPlayers() {
   document.getElementById('session-rake-controls').hidden = !editable;
   document.getElementById('session-player-entry').hidden = !editable;
   document.getElementById('session-buyin-action').hidden = !editable;
+  document.getElementById('session-expense-entry').hidden = !editable;
   document.getElementById('session-title').textContent = data.name;
   document.getElementById('session-rake-rate').value = rakeRate;
   document.getElementById('session-rake-summary').textContent = formatRate(rakeRate);
@@ -1234,7 +1236,10 @@ async function showGroupStats(groupId, navigate = true) {
           <div class="list-item expense-item">
             <div class="info">
               <div class="name expense-note">${escapeHtml(expense.note)}</div>
-              <div class="meta">${new Date(expense.created_at).toLocaleString()}</div>
+              <div class="meta">
+                ${new Date(expense.created_at).toLocaleString()}
+                <span class="expense-session-tag">${expense.session_name ? `关联 ${escapeHtml(expense.session_name)}` : '未关联场次'}</span>
+              </div>
             </div>
             <div class="amount">${formatPool(-Number(expense.amount))}</div>
             ${editable ? `<button class="delete-btn" onclick="deleteGroupPoolExpense(${expense.id})" aria-label="删除支出">🗑️</button>` : ''}
@@ -1332,13 +1337,40 @@ function showGroupPlayerHistory(playerIndex) {
 
 function openGroupExpenseModal() {
   if (!currentGroup || !canInput(currentGroup.access_level)) return;
+  prepareGroupExpenseModal({
+    groupId: currentGroup.id,
+    groupName: currentGroup.name,
+    sessionId: null,
+    sessionName: '',
+    source: 'group'
+  });
+}
+
+function openSessionExpenseModal() {
+  if (!currentSession || !canInput(currentSession.accessLevel)) return;
+  prepareGroupExpenseModal({
+    groupId: currentSession.groupId,
+    groupName: currentSession.groupName || '默认分组',
+    sessionId: currentSession.id,
+    sessionName: currentSession.name || '当前场次',
+    source: 'session'
+  });
+}
+
+function prepareGroupExpenseModal(context) {
+  groupExpenseContext = context;
   document.getElementById('group-expense-amount').value = '';
-  document.getElementById('group-expense-note').value = '';
+  document.getElementById('group-expense-note').value = context.sessionId ? context.sessionName : '';
+  document.getElementById('group-expense-context').textContent = `支出将从“${context.groupName}”水池中扣除`;
+  const sessionField = document.getElementById('group-expense-session-field');
+  sessionField.hidden = !context.sessionId;
+  document.getElementById('group-expense-link-session').checked = Boolean(context.sessionId);
+  document.getElementById('group-expense-session-name').textContent = context.sessionName || '当前场次';
   openModal('modal-group-expense');
 }
 
 async function createGroupPoolExpense() {
-  if (!currentGroup) return;
+  if (!groupExpenseContext) return;
   const amount = parseFloat(document.getElementById('group-expense-amount').value);
   const note = document.getElementById('group-expense-note').value.trim();
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -1351,12 +1383,25 @@ async function createGroupPoolExpense() {
   }
 
   try {
-    await api('/groups/' + currentGroup.id + '/expenses', {
+    const context = groupExpenseContext;
+    const linkToSession = context.sessionId
+      && document.getElementById('group-expense-link-session').checked;
+    await api('/groups/' + context.groupId + '/expenses', {
       method: 'POST',
-      body: JSON.stringify({ amount, note })
+      body: JSON.stringify({
+        amount,
+        note,
+        sessionId: linkToSession ? context.sessionId : null
+      })
     });
     closeModal('modal-group-expense');
-    await showGroupStats(currentGroup.id, false);
+    groupExpenseContext = null;
+    if (context.source === 'group') {
+      await showGroupStats(context.groupId, false);
+    } else {
+      currentGroupStats = null;
+      showToast(linkToSession ? '支出已计入分组并关联本场' : '支出已计入分组');
+    }
   } catch (err) {
     alert(err.message);
   }
