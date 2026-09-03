@@ -141,6 +141,7 @@ try {
     assertTrue(strpos((string) $root, '/fonts/NotoSansSC.ttf?v=' . $fontVersion) !== false, 'The app shell has a stale font version');
     assertTrue(strpos((string) $root, '__STYLE_VERSION__') === false, 'The app shell contains an unresolved asset placeholder');
     assertTrue(strpos((string) $root, 'id="session-expense-entry"') !== false, 'The session expense entry is missing');
+    assertTrue(strpos((string) $root, 'id="session-expense-details"') !== false, 'The session expense details are missing');
     assertTrue(strpos((string) $root, 'id="group-expense-link-session"') !== false, 'The optional session link control is missing');
     $cacheHeaders = array_filter($rootResponseHeaders, function (string $header): bool {
         return stripos($header, 'Cache-Control:') === 0;
@@ -718,6 +719,21 @@ try {
     assertTrue(
         ($linkedExpense['body']['expense']['session_name'] ?? null) === '水池误差测试',
         'The linked pool expense is missing its session name'
+    );
+
+    $sessionWithLinkedExpense = request('GET', $baseUrl . '/api/sessions/' . $sessionId, null, $authenticatedCookie);
+    assertTrue($sessionWithLinkedExpense['status'] === 200, 'Unable to load session-linked expenses');
+    assertTrue(
+        count($sessionWithLinkedExpense['body']['expenses'] ?? []) === 1,
+        'The session details did not return exactly its linked expenses'
+    );
+    assertTrue(
+        (int) ($sessionWithLinkedExpense['body']['expenses'][0]['id'] ?? 0) === $linkedExpenseId,
+        'The session details returned the wrong linked expense'
+    );
+    assertTrue(
+        (float) ($sessionWithLinkedExpense['body']['total_pool_expenses'] ?? 0) === 1.75,
+        'The session-linked expense total is incorrect'
     );
 
     $statsWithLinkedExpense = request('GET', $baseUrl . '/api/groups/' . $groupId . '/stats', null, $authenticatedCookie);

@@ -575,6 +575,24 @@ final class Application
             $players[] = $this->castPlayer($row);
         }
 
+        $expenseStatement = $this->pdo->prepare(
+            'SELECT id, group_id, session_id, amount, note, created_at
+             FROM group_pool_expenses
+             WHERE session_id = ?
+             ORDER BY created_at DESC, id DESC'
+        );
+        $expenseStatement->execute([$sessionId]);
+        $expenses = [];
+        $totalPoolExpenses = 0.0;
+        foreach ($expenseStatement->fetchAll() as $expense) {
+            $expense['id'] = (int) $expense['id'];
+            $expense['group_id'] = (int) $expense['group_id'];
+            $expense['session_id'] = (int) $expense['session_id'];
+            $expense['amount'] = (float) $expense['amount'];
+            $totalPoolExpenses += $expense['amount'];
+            $expenses[] = $expense;
+        }
+
         $session = $this->castSession($session);
         $stats = $this->calculateSessionStats(
             $sessionId,
@@ -593,6 +611,8 @@ final class Application
         $session['is_fully_settled'] = $stats['isFullySettled'];
         $session['rake_overridden'] = $stats['isRakeOverridden'];
         $session['players'] = $players;
+        $session['expenses'] = $expenses;
+        $session['total_pool_expenses'] = round($totalPoolExpenses, 2);
         $this->json($session);
     }
 

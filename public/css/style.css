@@ -1037,6 +1037,34 @@ select:focus {
   border-color: #b64b3d;
 }
 
+.session-expense-details {
+  padding: 2px 12px 11px;
+  background: linear-gradient(135deg, #fffaf8, #fff);
+  border: 1px solid #efd2cb;
+  border-radius: 10px;
+}
+
+.session-expense-details > summary {
+  color: #8f382d;
+}
+
+.session-expense-details .details-count {
+  color: #a5635a;
+}
+
+.session-expense-details .collapsible-content {
+  padding-top: 2px;
+}
+
+.session-expense-item {
+  border: 1px solid #f3dfda;
+  cursor: default;
+}
+
+.session-expense-item .meta {
+  font-variant-numeric: tabular-nums;
+}
+
 .final-rake-setting {
   margin-top: 8px;
   padding: 12px;
@@ -1946,43 +1974,102 @@ select:focus {
   }
 
   .rake-setting {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .rake-setting-copy p {
+    display: none;
   }
 
   .rake-controls {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .rake-controls .percent-input {
-    flex: 1;
+    width: 72px;
+    flex: 0 0 72px;
+  }
+
+  .rake-controls .btn {
+    padding: 7px 9px;
   }
 
   .final-rake-setting {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .final-rake-copy p {
+    display: none;
   }
 
   .final-rake-controls {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .final-rake-controls .money-input {
-    flex: 1;
-    width: auto;
+    width: 92px;
+    flex: 0 0 92px;
+  }
+
+  .final-rake-controls .btn {
+    padding: 7px 9px;
   }
 
   .group-setting {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .group-setting strong {
+    display: none;
   }
 
   .group-controls {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
   }
 
   .group-controls select {
     width: auto;
-    flex: 1;
+    min-width: 72px;
+    max-width: 140px;
+    flex: 1 1 112px;
+  }
+
+  #session-player-entry .input-row {
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+
+  #session-player-entry .player-name-picker {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  #session-player-entry #player-initial {
+    width: 82px !important;
+    min-width: 0;
+    flex: 0 0 82px;
+  }
+
+  #session-player-entry .btn {
+    flex: 0 0 auto;
+    padding-right: 10px;
+    padding-left: 10px;
   }
 }

@@ -201,6 +201,16 @@
           <button class="btn session-expense-add" onclick="openSessionExpenseModal()">+ 记支出</button>
         </div>
 
+        <details id="session-expense-details" class="section session-expense-details collapsible-section" hidden>
+          <summary>
+            <span class="details-title">本场支出明细</span>
+            <span id="session-expense-count" class="details-count">0 笔</span>
+          </summary>
+          <div class="collapsible-content">
+            <div id="session-expense-list" class="list"></div>
+          </div>
+        </details>
+
         <div class="final-rake-setting" id="session-final-rake-setting" hidden>
           <div class="final-rake-copy">
             <div class="final-rake-heading">

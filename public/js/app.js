@@ -706,6 +706,7 @@ async function openSession(id) {
     ? { ...session, groupId: session.group_id, rakeRate: session.rake_rate }
     : { id };
   document.getElementById('session-title').textContent = session ? session.name : '场次详情';
+  document.getElementById('session-expense-details').open = false;
   updatePlayerHistoryList(); // 加载历史姓名
   showPage('page-session');
   await loadPlayers();
@@ -734,6 +735,24 @@ async function loadPlayers() {
   document.getElementById('session-group-summary').textContent = (data.group_name || '默认分组')
     + (data.access_level !== 'owner' ? `（共享${data.access_level === 'input' ? '录入' : '查看'}）` : '');
   updateGroupSelect('session-group-select', data.group_id);
+
+  const sessionExpenses = Array.isArray(data.expenses) ? data.expenses : [];
+  const sessionExpenseDetails = document.getElementById('session-expense-details');
+  const sessionExpenseList = document.getElementById('session-expense-list');
+  const sessionExpenseTotal = Number(data.total_pool_expenses || 0);
+  sessionExpenseDetails.hidden = sessionExpenses.length === 0;
+  document.getElementById('session-expense-count').textContent = sessionExpenses.length
+    + ` 笔 · ${formatPool(-sessionExpenseTotal)}`;
+  sessionExpenseList.innerHTML = sessionExpenses.map(expense => `
+    <div class="list-item expense-item session-expense-item">
+      <div class="info">
+        <div class="name expense-note">${escapeHtml(expense.note)}</div>
+        <div class="meta">${new Date(expense.created_at).toLocaleString()}</div>
+      </div>
+      <div class="amount">${formatPool(-Number(expense.amount))}</div>
+      ${editable ? `<button class="delete-btn" onclick="deleteSessionPoolExpense(${expense.id})" aria-label="删除本场支出">🗑️</button>` : ''}
+    </div>
+  `).join('');
 
   const settledPlayers = data.players.filter(player => player.final_balance !== null);
   const finalRakeSetting = document.getElementById('session-final-rake-setting');
@@ -1400,8 +1419,22 @@ async function createGroupPoolExpense() {
       await showGroupStats(context.groupId, false);
     } else {
       currentGroupStats = null;
+      if (linkToSession) {
+        await loadPlayers();
+      }
       showToast(linkToSession ? '支出已计入分组并关联本场' : '支出已计入分组');
     }
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function deleteSessionPoolExpense(expenseId) {
+  if (!currentSession || !canInput(currentSession.accessLevel) || !confirm('确定删除这笔本场支出？')) return;
+  try {
+    await api('/group-expenses/' + expenseId, { method: 'DELETE' });
+    currentGroupStats = null;
+    await loadPlayers();
   } catch (err) {
     alert(err.message);
   }
