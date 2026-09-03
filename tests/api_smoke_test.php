@@ -143,6 +143,8 @@ try {
     assertTrue(strpos((string) $root, 'id="session-expense-entry"') !== false, 'The session expense entry is missing');
     assertTrue(strpos((string) $root, 'id="session-expense-details"') !== false, 'The session expense details are missing');
     assertTrue(strpos((string) $root, 'id="group-expense-link-session"') !== false, 'The optional session link control is missing');
+    assertTrue(strpos((string) $root, 'id="player-title-button"') !== false, 'The player-name edit entry is missing');
+    assertTrue(strpos((string) $root, 'id="modal-player-name"') !== false, 'The player-name edit modal is missing');
     $cacheHeaders = array_filter($rootResponseHeaders, function (string $header): bool {
         return stripos($header, 'Cache-Control:') === 0;
     });
@@ -251,11 +253,32 @@ try {
         assertTrue((float) ($batchPlayer['total_buyin_recorded'] ?? -1) === 88.5, 'A selected player is missing the initial buy-in record');
     }
 
+    $renamedBatchPlayerId = (int) ($batchPlayers[54]['id'] ?? 0);
+    $renamePlayer = request(
+        'PATCH',
+        $baseUrl . '/api/players/' . $renamedBatchPlayerId,
+        ['name' => '改名后玩家'],
+        $authenticatedCookie
+    );
+    assertTrue($renamePlayer['status'] === 200, 'Unable to rename a player');
+    assertTrue(($renamePlayer['body']['name'] ?? null) === '改名后玩家', 'The renamed player response is incorrect');
+    $duplicateRename = request(
+        'PATCH',
+        $baseUrl . '/api/players/' . $renamedBatchPlayerId,
+        ['name' => '历史玩家54'],
+        $authenticatedCookie
+    );
+    assertTrue($duplicateRename['status'] === 400, 'A player was renamed to a duplicate session name');
+    $renamedBatchSession = request('GET', $baseUrl . '/api/sessions/' . $batchSessionId, null, $authenticatedCookie);
+    $renamedBatchNames = array_column($renamedBatchSession['body']['players'] ?? [], 'name');
+    assertTrue(in_array('改名后玩家', $renamedBatchNames, true), 'The renamed player name was not persisted');
+    assertTrue(!in_array('历史玩家55', $renamedBatchNames, true), 'The old player name remains after renaming');
+
     $allPlayerNames = request('GET', $baseUrl . '/api/player-names', null, $authenticatedCookie);
     assertTrue($allPlayerNames['status'] === 200, 'Unable to load all historical player names');
     assertTrue(count($allPlayerNames['body']) === 55, 'Historical player names are still limited to 50 entries');
     assertTrue(in_array('历史玩家01', $allPlayerNames['body'], true), 'The oldest batch player is missing from history');
-    assertTrue(in_array('历史玩家55', $allPlayerNames['body'], true), 'The newest batch player is missing from history');
+    assertTrue(in_array('改名后玩家', $allPlayerNames['body'], true), 'The renamed batch player is missing from history');
 
     $sessionsBeforeDuplicate = request('GET', $baseUrl . '/api/sessions', null, $authenticatedCookie);
     $duplicateBatchSession = request(
@@ -815,6 +838,13 @@ try {
     assertTrue($viewerWrite['status'] === 403, 'View permission allowed a pool expense');
     $viewerDelete = request('DELETE', $baseUrl . '/api/sessions/' . $sessionId, null, $otherCookie);
     assertTrue($viewerDelete['status'] === 403, 'View permission allowed deleting a session');
+    $viewerRename = request(
+        'PATCH',
+        $baseUrl . '/api/players/' . $winnerId,
+        ['name' => '查看用户不应改名'],
+        $otherCookie
+    );
+    assertTrue($viewerRename['status'] === 403, 'View permission allowed renaming a player');
     $viewerBuyinDelete = request(
         'DELETE',
         $baseUrl . '/api/buyins/' . $winnerInitialBuyinId,
@@ -863,6 +893,14 @@ try {
     );
     assertTrue($inputPlayer['status'] === 200, 'Input permission cannot add a player');
     $inputPlayerId = (int) ($inputPlayer['body']['playerId'] ?? 0);
+    $inputPlayerRename = request(
+        'PATCH',
+        $baseUrl . '/api/players/' . $inputPlayerId,
+        ['name' => '协作改名'],
+        $otherCookie
+    );
+    assertTrue($inputPlayerRename['status'] === 200, 'Input permission cannot rename a player');
+    assertTrue(($inputPlayerRename['body']['name'] ?? null) === '协作改名', 'Input player rename was not saved');
     $inputPlayerBuyins = request(
         'GET',
         $baseUrl . '/api/players/' . $inputPlayerId . '/buyins',
@@ -911,6 +949,7 @@ try {
     assertTrue(!in_array('赢家', $revokedPlayerNames['body'], true), 'Revoked winner remains in player-name history');
     assertTrue(!in_array('输家', $revokedPlayerNames['body'], true), 'Revoked loser remains in player-name history');
     assertTrue(!in_array('协作录入', $revokedPlayerNames['body'], true), 'Revoked collaborator player remains in player-name history');
+    assertTrue(!in_array('协作改名', $revokedPlayerNames['body'], true), 'Revoked renamed player remains in player-name history');
 
     $deleteInputExpense = request('DELETE', $baseUrl . '/api/group-expenses/' . $inputExpenseId, null, $authenticatedCookie);
     assertTrue($deleteInputExpense['status'] === 200, 'Owner cannot delete collaborator-created expense');

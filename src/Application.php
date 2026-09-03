@@ -156,8 +156,13 @@ final class Application
             $this->settlePlayer((int) $matches[1], $this->requireUser());
         }
 
-        if (preg_match('#^/api/players/(\d+)$#', $path, $matches) === 1 && $method === 'DELETE') {
-            $this->deletePlayer((int) $matches[1], $this->requireUser());
+        if (preg_match('#^/api/players/(\d+)$#', $path, $matches) === 1) {
+            if ($method === 'PATCH') {
+                $this->updatePlayerName((int) $matches[1], $this->requireUser());
+            }
+            if ($method === 'DELETE') {
+                $this->deletePlayer((int) $matches[1], $this->requireUser());
+            }
         }
 
         throw new HttpException(404, '接口不存在');
@@ -777,6 +782,31 @@ final class Application
             $statement->execute([$playerId]);
         });
         $this->json(['success' => true]);
+    }
+
+    private function updatePlayerName(int $playerId, int $userId): void
+    {
+        $player = $this->accessiblePlayer($playerId, $userId, 'input');
+        $body = $this->requestBody();
+        $name = trim($this->requiredString($body, 'name', '玩家姓名'));
+        if (strlen($name) > 100) {
+            throw new HttpException(400, '玩家姓名不能超过100个字符');
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT id
+             FROM players
+             WHERE session_id = ? AND id <> ? AND name = ? COLLATE NOCASE
+             LIMIT 1'
+        );
+        $statement->execute([(int) $player['session_id'], $playerId, $name]);
+        if ($statement->fetch() !== false) {
+            throw new HttpException(400, '该场次已有同名玩家');
+        }
+
+        $statement = $this->pdo->prepare('UPDATE players SET name = ? WHERE id = ?');
+        $statement->execute([$name, $playerId]);
+        $this->json(['success' => true, 'playerId' => $playerId, 'name' => $name]);
     }
 
     private function addBuyin(int $playerId, int $userId): void

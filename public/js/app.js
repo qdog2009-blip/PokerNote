@@ -257,6 +257,21 @@ function savePlayerName(name) {
   updatePlayerHistoryList();
 }
 
+function replaceLocalPlayerName(oldName, newName) {
+  const oldKey = oldName.trim().toLocaleLowerCase();
+  const newKey = newName.trim().toLocaleLowerCase();
+  const history = getLocalPlayerHistory().filter(item => {
+    const key = item.trim().toLocaleLowerCase();
+    return key !== oldKey && key !== newKey;
+  });
+  history.unshift(newName.trim());
+  try {
+    localStorage.setItem(playerHistoryStorageKey(), JSON.stringify(history.slice(0, 20)));
+  } catch (error) {
+    // 部分手机隐私模式会禁用 localStorage，数据库中的姓名仍会正常更新。
+  }
+}
+
 function updatePlayerHistoryList() {
   const input = document.getElementById('player-name');
   if (input && document.activeElement === input) {
@@ -784,12 +799,14 @@ async function loadPlayers() {
     );
     const totalSettled = settledPlayers.reduce((sum, player) => sum + Number(player.final_balance || 0), 0);
     const settlementError = roundMoney(totalBuyin - totalSettled);
-    document.getElementById('session-error-amount').textContent = formatPool(settlementError);
-    errorSummary.classList.toggle('balanced', settlementError === 0);
-    errorSummary.hidden = false;
+    if (settlementError !== 0) {
+      document.getElementById('session-error-amount').textContent = formatPool(settlementError);
+      errorSummary.hidden = false;
+    } else {
+      errorSummary.hidden = true;
+    }
   } else {
     errorSummary.hidden = true;
-    errorSummary.classList.remove('balanced');
   }
   
   if (data.players.length === 0) {
@@ -1021,6 +1038,7 @@ async function openPlayer(id) {
   currentPlayer = { id, name };
   document.getElementById('player-title').textContent = name;
   const editable = currentSession && canInput(currentSession.accessLevel);
+  document.getElementById('player-title-button').disabled = !editable;
   document.getElementById('player-buyin-entry').hidden = !editable;
   document.getElementById('player-settlement-entry').hidden = !editable;
   showPage('page-player');
@@ -1037,6 +1055,10 @@ async function loadPlayerDetail() {
   // 获取玩家信息
   const playerInfo = await api('/sessions/' + currentSession.id);
   const player = playerInfo.players.find(p => p.id === currentPlayer.id);
+  if (player) {
+    currentPlayer.name = player.name;
+    document.getElementById('player-title').textContent = player.name;
+  }
   const finalBalance = player ? player.final_balance : null;
   const rakeRate = Number(playerInfo.rake_rate || 0);
   const result = calculatePlayerResult(totalBuyin, finalBalance, rakeRate);
@@ -1075,6 +1097,44 @@ async function loadPlayerDetail() {
       </div>
     </div>
   `).join('') || '<div class="empty-state">暂无买入记录</div>';
+}
+
+function openRenamePlayerModal() {
+  if (!currentPlayer || !currentSession || !canInput(currentSession.accessLevel)) return;
+  const input = document.getElementById('rename-player-name');
+  input.value = currentPlayer.name || '';
+  openModal('modal-player-name');
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
+}
+
+async function renameCurrentPlayer() {
+  if (!currentPlayer || !currentSession || !canInput(currentSession.accessLevel)) return;
+  const name = document.getElementById('rename-player-name').value.trim();
+  if (!name) {
+    alert('请输入玩家姓名');
+    return;
+  }
+
+  try {
+    const oldName = currentPlayer.name || '';
+    const result = await api('/players/' + currentPlayer.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ name })
+    });
+    currentPlayer.name = result.name;
+    document.getElementById('player-title').textContent = result.name;
+    replaceLocalPlayerName(oldName, result.name);
+    closeModal('modal-player-name');
+    currentGroupStats = null;
+    await loadPlayers();
+    await loadAccountPlayerHistory();
+    showToast('玩家姓名已修改');
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function deleteBuyin(buyinId) {

@@ -274,7 +274,12 @@
     <div id="page-player" class="page">
       <header>
         <button class="btn back" onclick="goBack()">← 返回</button>
-        <h2 id="player-title">玩家详情</h2>
+        <h2 class="player-title-heading">
+          <button type="button" id="player-title-button" class="player-title-button" onclick="openRenamePlayerModal()" aria-label="修改玩家姓名">
+            <span id="player-title">玩家详情</span>
+            <span class="player-title-edit" aria-hidden="true">✎</span>
+          </button>
+        </h2>
       </header>
       <div class="container">
         <div class="stats-card">
@@ -448,7 +453,25 @@
       </div>
     </div>
   </div>
-  
+
+  <!-- 修改玩家姓名弹窗 -->
+  <div id="modal-player-name" class="modal">
+    <div class="modal-content rename-player-modal-content">
+      <form onsubmit="event.preventDefault(); renameCurrentPlayer()">
+        <h3>修改玩家姓名</h3>
+        <div class="modal-field">
+          <label for="rename-player-name">玩家姓名</label>
+          <input type="text" id="rename-player-name" maxlength="100" autocomplete="off" placeholder="输入新的玩家姓名">
+        </div>
+        <p class="modal-tip">只修改这名玩家在当前场次中的姓名。</p>
+        <div class="modal-actions">
+          <button type="button" class="btn" onclick="closeModal('modal-player-name')">取消</button>
+          <button type="submit" class="btn primary">保存姓名</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 创建分组弹窗 -->
   <div id="modal-group" class="modal">
     <div class="modal-content">
