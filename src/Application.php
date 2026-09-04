@@ -1185,7 +1185,16 @@ final class Application
             (float) $session['rake_rate'],
             $session['final_rake'] === null ? null : (float) $session['final_rake']
         );
+        $expenseStatement = $this->pdo->prepare(
+            'SELECT COALESCE(SUM(amount), 0)
+             FROM group_pool_expenses
+             WHERE session_id = ?'
+        );
+        $expenseStatement->execute([$sessionId]);
+        $totalPoolExpenses = round((float) $expenseStatement->fetchColumn(), 2);
         $stats['rakeRate'] = (float) $session['rake_rate'];
+        $stats['totalPoolExpenses'] = $totalPoolExpenses;
+        $stats['waterPoolBalance'] = round($stats['waterPool'] - $totalPoolExpenses, 2);
         $this->json($stats);
     }
 

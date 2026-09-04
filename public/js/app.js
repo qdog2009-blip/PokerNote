@@ -1228,6 +1228,10 @@ async function showSessionStats() {
       : '盈利玩家抽水';
     document.getElementById('stat-total-rake').textContent = formatRake(data.totalRake);
     renderWaterPool('stat', data.waterPool);
+    document.getElementById('stat-pool-expenses').textContent = formatPool(-Number(data.totalPoolExpenses || 0));
+    const waterPoolBalance = roundMoney(Number(data.waterPoolBalance || 0));
+    document.getElementById('stat-rake-balance').textContent = formatPool(waterPoolBalance);
+    document.getElementById('stat-rake-balance-row').classList.toggle('negative', waterPoolBalance < 0);
     document.getElementById('stat-net-settled').textContent = formatMoney(data.totalNetSettled);
     renderPoolAdjustment('stat', data.waterPoolAdjustment, !data.isFullySettled);
     

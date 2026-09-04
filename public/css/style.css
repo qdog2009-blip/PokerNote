@@ -1438,6 +1438,15 @@ select:focus {
   font-weight: 600;
 }
 
+.summary-row.rake-balance-summary {
+  color: #16845b;
+  font-weight: 700;
+}
+
+.summary-row.rake-balance-summary.negative {
+  color: var(--danger);
+}
+
 .summary-row.net-summary {
   color: var(--primary-dark);
   font-weight: 600;

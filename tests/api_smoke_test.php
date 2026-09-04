@@ -767,6 +767,22 @@ try {
         'Group stats lost the expense session association'
     );
 
+    $sessionStatsWithExpense = request(
+        'GET',
+        $baseUrl . '/api/sessions/' . $sessionId . '/stats',
+        null,
+        $authenticatedCookie
+    );
+    assertTrue($sessionStatsWithExpense['status'] === 200, 'Unable to load session stats with expenses');
+    assertTrue(
+        (float) ($sessionStatsWithExpense['body']['totalPoolExpenses'] ?? 0) === 1.75,
+        'Session stats did not include its linked expense total'
+    );
+    assertTrue(
+        (float) ($sessionStatsWithExpense['body']['waterPoolBalance'] ?? 0) === -4.75,
+        'Session water-pool balance did not deduct linked expenses'
+    );
+
     $deleteLinkedExpense = request(
         'DELETE',
         $baseUrl . '/api/group-expenses/' . $linkedExpenseId,
