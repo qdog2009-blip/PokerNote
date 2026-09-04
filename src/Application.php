@@ -1185,6 +1185,18 @@ final class Application
             (float) $session['rake_rate'],
             $session['final_rake'] === null ? null : (float) $session['final_rake']
         );
+        usort($stats['players'], static function (array $left, array $right): int {
+            if ($left['profitLoss'] === null || $right['profitLoss'] === null) {
+                if ($left['profitLoss'] === null && $right['profitLoss'] === null) {
+                    return $left['id'] <=> $right['id'];
+                }
+                return $left['profitLoss'] === null ? 1 : -1;
+            }
+            $resultComparison = $right['profitLoss'] <=> $left['profitLoss'];
+            return $resultComparison !== 0
+                ? $resultComparison
+                : ($left['id'] <=> $right['id']);
+        });
         $expenseStatement = $this->pdo->prepare(
             'SELECT COALESCE(SUM(amount), 0)
              FROM group_pool_expenses

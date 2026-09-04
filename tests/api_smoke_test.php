@@ -145,6 +145,9 @@ try {
     assertTrue(strpos((string) $root, 'id="group-expense-link-session"') !== false, 'The optional session link control is missing');
     assertTrue(strpos((string) $root, 'id="player-title-button"') !== false, 'The player-name edit entry is missing');
     assertTrue(strpos((string) $root, 'id="modal-player-name"') !== false, 'The player-name edit modal is missing');
+    assertTrue(strpos((string) $root, 'id="stat-total-settled"') === false, 'Session stats still show the pre-rake settlement total');
+    assertTrue(strpos((string) $root, 'id="stat-total-rake"') === false, 'Session stats still show the standalone rake total');
+    assertTrue(strpos((string) $root, 'id="stat-net-settled"') === false, 'Session stats still show the player net settlement total');
     $cacheHeaders = array_filter($rootResponseHeaders, function (string $header): bool {
         return stripos($header, 'Cache-Control:') === 0;
     });
@@ -387,16 +390,16 @@ try {
     assertTrue($session['status'] === 200, 'Unable to create the water-pool test session');
     $sessionId = (int) ($session['body']['sessionId'] ?? 0);
 
-    $winner = request(
-        'POST',
-        $baseUrl . '/api/sessions/' . $sessionId . '/players',
-        ['name' => '赢家', 'initialBuyin' => 100],
-        $authenticatedCookie
-    );
     $loser = request(
         'POST',
         $baseUrl . '/api/sessions/' . $sessionId . '/players',
         ['name' => '输家', 'initialBuyin' => 100],
+        $authenticatedCookie
+    );
+    $winner = request(
+        'POST',
+        $baseUrl . '/api/sessions/' . $sessionId . '/players',
+        ['name' => '赢家', 'initialBuyin' => 100],
         $authenticatedCookie
     );
     assertTrue($winner['status'] === 200 && $loser['status'] === 200, 'Unable to create test players');
@@ -420,6 +423,10 @@ try {
     assertTrue(($partialStats['body']['isFullySettled'] ?? true) === false, 'A partial settlement was marked complete');
     assertTrue((float) ($partialStats['body']['waterPoolAdjustment'] ?? -1) === 0.0, 'A partial error was applied to the water pool');
     assertTrue((float) ($partialStats['body']['waterPool'] ?? -1) === 5.0, 'Partial water pool should contain only winner rake');
+    assertTrue(
+        array_column($partialStats['body']['players'] ?? [], 'name') === ['赢家', '输家'],
+        'Session stats are not sorted by net profit with unsettled players last'
+    );
     $prematureFinalRake = request(
         'PATCH',
         $baseUrl . '/api/sessions/' . $sessionId,
@@ -450,6 +457,10 @@ try {
     assertTrue((float) ($positiveStats['body']['error'] ?? -1) === 10.0, 'Positive settlement error is incorrect');
     assertTrue((float) ($positiveStats['body']['waterPoolAdjustment'] ?? -1) === 10.0, 'Positive error was not added to the water pool');
     assertTrue((float) ($positiveStats['body']['waterPool'] ?? -1) === 15.0, 'Positive-error water pool is incorrect');
+    assertTrue(
+        array_column($positiveStats['body']['players'] ?? [], 'name') === ['赢家', '输家'],
+        'Fully settled session stats are not sorted by net profit descending'
+    );
 
     $manualFinalPool = request(
         'PATCH',
