@@ -732,11 +732,11 @@ select:focus {
 }
 
 .list-item .amount.profit {
-  color: var(--success);
+  color: var(--danger);
 }
 
 .list-item .amount.loss {
-  color: var(--danger);
+  color: var(--success);
 }
 
 #players-list .amount.player-win {
@@ -1345,6 +1345,14 @@ select:focus {
 
 .stats-card .rake-value {
   color: #ffe3a3;
+}
+
+.stats-card .value.profit {
+  color: #fecaca;
+}
+
+.stats-card .value.loss {
+  color: #bbf7d0;
 }
 
 .player-result {
