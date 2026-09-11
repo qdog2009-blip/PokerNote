@@ -627,7 +627,7 @@ try {
     $singleSessionSettlement = request(
         'POST',
         $baseUrl . '/api/players/' . (int) ($singleSessionPlayer['body']['playerId'] ?? 0) . '/settle',
-        ['finalBalance' => 40],
+        ['finalBalance' => 150],
         $authenticatedCookie
     );
     assertTrue(
@@ -650,11 +650,16 @@ try {
         ($rankingSessionStats['playerNames'] ?? []) === ['赢家', '单场玩家'],
         'Session player names are missing or out of order in group stats'
     );
-    assertTrue(($rankedPlayers[0]['name'] ?? null) === '赢家', 'Players are not sorted by session count descending');
-    assertTrue((int) ($rankedPlayers[0]['sessionCount'] ?? 0) === 2, 'Cumulative session count is incorrect');
-    assertTrue((int) ($rankedPlayers[0]['winningSessionCount'] ?? 0) === 2, 'Winning session count is incorrect');
-    assertTrue((float) ($rankedPlayers[0]['grossProfitLoss'] ?? -1) === 70.0, 'Pre-rake cumulative result is incorrect');
-    $winnerSessions = $rankedPlayers[0]['sessions'] ?? [];
+    assertTrue(
+        array_column($rankedPlayers, 'name') === ['单场玩家', '赢家', '输家'],
+        'Group players must be ranked by pre-rake cumulative result, not participation count'
+    );
+    assertTrue((int) ($rankedPlayers[0]['sessionCount'] ?? 0) === 1, 'The highest-result player should have only one session');
+    assertTrue((float) ($rankedPlayers[0]['grossProfitLoss'] ?? -1) === 100.0, 'The highest pre-rake cumulative result is incorrect');
+    assertTrue((int) ($rankedPlayers[1]['sessionCount'] ?? 0) === 2, 'Cumulative session count is incorrect');
+    assertTrue((int) ($rankedPlayers[1]['winningSessionCount'] ?? 0) === 2, 'Winning session count is incorrect');
+    assertTrue((float) ($rankedPlayers[1]['grossProfitLoss'] ?? -1) === 70.0, 'Pre-rake cumulative result is incorrect');
+    $winnerSessions = $rankedPlayers[1]['sessions'] ?? [];
     assertTrue(count($winnerSessions) === 2, 'Cumulative player session history is incomplete');
     assertTrue(
         (int) ($winnerSessions[0]['sessionId'] ?? 0) === $rankingSessionId,
@@ -670,8 +675,8 @@ try {
     );
     for ($playerIndex = 1; $playerIndex < count($rankedPlayers); $playerIndex++) {
         assertTrue(
-            (int) $rankedPlayers[$playerIndex - 1]['sessionCount'] >= (int) $rankedPlayers[$playerIndex]['sessionCount'],
-            'Player session counts are not in descending order'
+            $rankedPlayers[$playerIndex - 1]['grossProfitLoss'] >= $rankedPlayers[$playerIndex]['grossProfitLoss'],
+            'Player pre-rake cumulative results are not in descending order'
         );
     }
 

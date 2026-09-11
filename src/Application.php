@@ -1054,15 +1054,15 @@ final class Application
             ];
         }
         usort($players, function (array $left, array $right): int {
-            $sessionComparison = $right['sessionCount'] <=> $left['sessionCount'];
-            if ($sessionComparison !== 0) {
-                return $sessionComparison;
-            }
             $leftValue = $left['grossProfitLoss'] === null ? -PHP_FLOAT_MAX : $left['grossProfitLoss'];
             $rightValue = $right['grossProfitLoss'] === null ? -PHP_FLOAT_MAX : $right['grossProfitLoss'];
             $resultComparison = $rightValue <=> $leftValue;
-            return $resultComparison !== 0
-                ? $resultComparison
+            if ($resultComparison !== 0) {
+                return $resultComparison;
+            }
+            $sessionComparison = $right['sessionCount'] <=> $left['sessionCount'];
+            return $sessionComparison !== 0
+                ? $sessionComparison
                 : strcmp($left['name'], $right['name']);
         });
 
