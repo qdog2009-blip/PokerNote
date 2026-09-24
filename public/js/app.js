@@ -7,6 +7,7 @@ let currentSessionPlayers = [];
 let currentGroup = null;
 let currentGroupStats = null;
 let groupExpenseContext = null;
+let groupExpenseSubmitting = false;
 let currentPlayer = null;
 let selectedBuyinPlayerId = null;
 let pageHistory = ['page-sessions'];
@@ -30,16 +31,24 @@ async function api(path, options = {}) {
     headers['X-PokerNote-Token'] = token;
   }
 
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers
-  });
+  let res;
+  try {
+    res = await fetch(API_BASE + path, {
+      ...options,
+      headers
+    });
+  } catch (error) {
+    const networkError = new Error('网络连接失败，请检查连接后重试');
+    networkError.code = 'NETWORK_ERROR';
+    throw networkError;
+  }
   let responseText;
   try {
     responseText = await res.text();
   } catch (error) {
     const responseError = new Error('无法读取服务器响应，请稍后重试');
     responseError.status = res.status;
+    responseError.code = 'NETWORK_ERROR';
     throw responseError;
   }
 
@@ -1264,7 +1273,7 @@ async function showSessionStats() {
   }
 }
 
-async function showGroupStats(groupId, navigate = true) {
+async function showGroupStats(groupId, navigate = true, showError = true) {
   try {
     const data = await api('/groups/' + groupId + '/stats');
     currentGroup = data.group;
@@ -1361,8 +1370,10 @@ async function showGroupStats(groupId, navigate = true) {
       document.getElementById('group-expense-details').open = false;
       showPage('page-group-stats');
     }
+    return true;
   } catch (err) {
-    alert(err.message);
+    if (showError) alert(err.message);
+    return false;
   }
 }
 
@@ -1447,7 +1458,7 @@ function prepareGroupExpenseModal(context) {
 }
 
 async function createGroupPoolExpense() {
-  if (!groupExpenseContext) return;
+  if (!groupExpenseContext || groupExpenseSubmitting) return;
   const amount = parseFloat(document.getElementById('group-expense-amount').value);
   const note = document.getElementById('group-expense-note').value.trim();
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -1459,6 +1470,10 @@ async function createGroupPoolExpense() {
     return;
   }
 
+  groupExpenseSubmitting = true;
+  const submitButton = document.getElementById('btn-confirm-group-expense');
+  submitButton.disabled = true;
+  let saved = false;
   try {
     const context = groupExpenseContext;
     const linkToSession = context.sessionId
@@ -1471,10 +1486,16 @@ async function createGroupPoolExpense() {
         sessionId: linkToSession ? context.sessionId : null
       })
     });
+    saved = true;
     closeModal('modal-group-expense');
     groupExpenseContext = null;
     if (context.source === 'group') {
-      await showGroupStats(context.groupId, false);
+      const refreshed = await showGroupStats(context.groupId, false, false);
+      if (refreshed) {
+        showToast('支出已计入分组');
+      } else {
+        alert('支出已保存，但统计刷新失败；请稍后重新进入分组统计查看');
+      }
     } else {
       currentGroupStats = null;
       if (linkToSession) {
@@ -1483,7 +1504,16 @@ async function createGroupPoolExpense() {
       showToast(linkToSession ? '支出已计入分组并关联本场' : '支出已计入分组');
     }
   } catch (err) {
-    alert(err.message);
+    if (saved) {
+      alert('支出已保存，但页面刷新失败；请稍后重新进入查看');
+    } else if (err.code === 'NETWORK_ERROR') {
+      alert('支出提交未得到服务器确认。请检查网络并刷新支出明细，确认是否已添加，避免重复记录；已填内容会保留。');
+    } else {
+      alert(err.message);
+    }
+  } finally {
+    groupExpenseSubmitting = false;
+    submitButton.disabled = false;
   }
 }
 
