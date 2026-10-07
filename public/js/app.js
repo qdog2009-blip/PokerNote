@@ -9,6 +9,7 @@ let currentGroupStats = null;
 let groupExpenseContext = null;
 let groupExpenseSubmitting = false;
 let currentPlayer = null;
+let playerDetailRequestId = 0;
 let selectedBuyinPlayerId = null;
 let pageHistory = ['page-sessions'];
 let accountPlayerHistory = [];
@@ -1092,58 +1093,85 @@ async function openPlayer(id) {
   document.getElementById('player-title-button').disabled = !editable;
   document.getElementById('player-buyin-entry').hidden = !editable;
   document.getElementById('player-settlement-entry').hidden = !editable;
+  resetPlayerDetailView();
   showPage('page-player');
-  loadPlayerDetail();
+  void loadPlayerDetail();
+}
+
+function resetPlayerDetailView() {
+  playerDetailRequestId++;
+  document.getElementById('player-total-buyin').textContent = '-';
+  document.getElementById('player-final').textContent = '-';
+  document.getElementById('player-rake').textContent = '-';
+  const profit = document.getElementById('player-profit');
+  profit.textContent = '-';
+  profit.className = 'value';
+  document.getElementById('settlement-rake-note').textContent = '正在读取玩家记录…';
+  document.getElementById('buyins-list').innerHTML = '<div class="empty-state">加载中…</div>';
 }
 
 async function loadPlayerDetail() {
-  const data = await api('/players/' + currentPlayer.id + '/buyins');
-  const buyins = data;
-  const player = currentSessionPlayers.find(item => Number(item.id) === Number(currentPlayer.id));
-  if (!player) return;
-  
-  // 计算总买入
-  const totalBuyin = buyins.reduce((sum, b) => sum + b.amount, 0);
-  
-  currentPlayer.name = player.name;
-  document.getElementById('player-title').textContent = player.name;
-  const finalBalance = player.final_balance;
-  const rakeRate = Number(currentSession.rakeRate || 0);
-  const result = calculatePlayerResult(totalBuyin, finalBalance, rakeRate);
-  
-  // 更新统计
-  document.getElementById('player-total-buyin').textContent = formatMoney(totalBuyin);
-  document.getElementById('player-final').textContent = finalBalance !== null ? formatMoney(finalBalance) : '-';
-  document.getElementById('player-rake').textContent = result.rake !== null ? formatRake(result.rake) : '-';
-  document.getElementById('settlement-rake-note').textContent = `盈利玩家按本场 ${formatRate(rakeRate)} 抽水，亏损玩家不抽水`;
-  
-  if (finalBalance !== null) {
-    const profit = result.profitLoss;
-    const profitEl = document.getElementById('player-profit');
-    const profitClass = profit >= 0 ? 'profit' : 'loss';
-    const profitText = profit >= 0 ? `净水上${formatMoney(profit)}` : `水下${formatMoney(Math.abs(profit))}`;
-    profitEl.textContent = profitText;
-    profitEl.className = 'value ' + profitClass;
-  } else {
-    document.getElementById('player-profit').textContent = '-';
-    document.getElementById('player-profit').className = 'value';
+  const playerId = Number(currentPlayer.id);
+  const requestId = ++playerDetailRequestId;
+  try {
+    const data = await api('/players/' + playerId + '/buyins');
+    if (
+      requestId !== playerDetailRequestId
+      || !currentPlayer
+      || Number(currentPlayer.id) !== playerId
+    ) {
+      return;
+    }
+
+    const buyins = data;
+    const player = currentSessionPlayers.find(item => Number(item.id) === playerId);
+    if (!player) return;
+
+    const totalBuyin = buyins.reduce((sum, b) => sum + b.amount, 0);
+    currentPlayer.name = player.name;
+    document.getElementById('player-title').textContent = player.name;
+    const finalBalance = player.final_balance;
+    const rakeRate = Number(currentSession.rakeRate || 0);
+    const result = calculatePlayerResult(totalBuyin, finalBalance, rakeRate);
+
+    document.getElementById('player-total-buyin').textContent = formatMoney(totalBuyin);
+    document.getElementById('player-final').textContent = finalBalance !== null ? formatMoney(finalBalance) : '-';
+    document.getElementById('player-rake').textContent = result.rake !== null ? formatRake(result.rake) : '-';
+    document.getElementById('settlement-rake-note').textContent = `盈利玩家按本场 ${formatRate(rakeRate)} 抽水，亏损玩家不抽水`;
+
+    if (finalBalance !== null) {
+      const profit = result.profitLoss;
+      const profitEl = document.getElementById('player-profit');
+      const profitClass = profit >= 0 ? 'profit' : 'loss';
+      const profitText = profit >= 0 ? `净水上${formatMoney(profit)}` : `水下${formatMoney(Math.abs(profit))}`;
+      profitEl.textContent = profitText;
+      profitEl.className = 'value ' + profitClass;
+    }
+
+    const list = document.getElementById('buyins-list');
+    const editable = currentSession && canInput(currentSession.accessLevel);
+    list.innerHTML = buyins.map((b, i) => `
+      <div class="list-item small">
+        <div class="info">
+          <div class="name">第 ${i + 1} 次买入</div>
+          <div class="meta">${formatServerDateTime(b.created_at)}</div>
+        </div>
+        <div class="buyin-record-actions">
+          <span class="amount">${formatMoney(b.amount)}</span>
+          ${editable ? `<button class="delete-btn" onclick="deleteBuyin(${b.id})" aria-label="删除第 ${i + 1} 次买入">🗑️</button>` : ''}
+        </div>
+      </div>
+    `).join('') || '<div class="empty-state">暂无买入记录</div>';
+  } catch (err) {
+    if (
+      requestId === playerDetailRequestId
+      && currentPlayer
+      && Number(currentPlayer.id) === playerId
+    ) {
+      document.getElementById('buyins-list').innerHTML = '<div class="empty-state">加载失败，请稍后重试</div>';
+      document.getElementById('settlement-rake-note').textContent = err.message;
+    }
   }
-  
-  // 显示买入记录
-  const list = document.getElementById('buyins-list');
-  const editable = currentSession && canInput(currentSession.accessLevel);
-  list.innerHTML = buyins.map((b, i) => `
-    <div class="list-item small">
-      <div class="info">
-        <div class="name">第 ${i + 1} 次买入</div>
-        <div class="meta">${formatServerDateTime(b.created_at)}</div>
-      </div>
-      <div class="buyin-record-actions">
-        <span class="amount">${formatMoney(b.amount)}</span>
-        ${editable ? `<button class="delete-btn" onclick="deleteBuyin(${b.id})" aria-label="删除第 ${i + 1} 次买入">🗑️</button>` : ''}
-      </div>
-    </div>
-  `).join('') || '<div class="empty-state">暂无买入记录</div>';
 }
 
 function openRenamePlayerModal() {
