@@ -18,6 +18,10 @@ let toastTimer = null;
 const API_BASE = '/api';
 const AUTH_TOKEN_STORAGE_KEY = 'pokernoteAuthToken';
 const LAST_RAKE_RATE_STORAGE_KEY = 'pokernoteLastRakeRate';
+const SERVER_TIMEZONE = typeof window !== 'undefined'
+  && typeof window.POKERNOTE_SERVER_TIMEZONE === 'string'
+  ? window.POKERNOTE_SERVER_TIMEZONE
+  : 'UTC';
 
 // ==================== 工具函数 ====================
 
@@ -112,6 +116,40 @@ function clearAuthToken() {
 
 function formatMoney(num) {
   return '¥' + (Math.round(num * 100) / 100).toFixed(2);
+}
+
+function parseStoredTimestamp(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const text = value.trim().replace(' ', 'T');
+  const normalized = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(text) ? text : text + 'Z';
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatServerDate(value) {
+  const date = parseStoredTimestamp(value);
+  if (!date) return '-';
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: SERVER_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
+
+function formatServerDateTime(value) {
+  const date = parseStoredTimestamp(value);
+  if (!date) return '-';
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: SERVER_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(date);
 }
 
 function roundMoney(num) {
@@ -475,7 +513,7 @@ async function loadSessions() {
           <div class="list-item" onclick="openSession(${session.id})">
             <div class="info">
               <div class="name">${escapeHtml(session.name)}</div>
-              <div class="meta">${session.player_count}人 · 抽水 ${formatRate(session.rake_rate)} · ${new Date(session.created_at).toLocaleDateString()}</div>
+              <div class="meta">${session.player_count}人 · 抽水 ${formatRate(session.rake_rate)} · ${formatServerDate(session.created_at)}</div>
             </div>
             ${session.settled_count > 0 ? '<span class="settled-badge">已结算</span>' : ''}
             ${canInput(session.access_level) ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteSession(${session.id})">🗑️</button>` : ''}
@@ -568,9 +606,13 @@ async function createGroup() {
 }
 
 function defaultSessionName() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SERVER_TIMEZONE,
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const month = parts.find(part => part.type === 'month').value;
+  const day = parts.find(part => part.type === 'day').value;
   return month + day;
 }
 
@@ -771,7 +813,7 @@ async function loadPlayers() {
     <div class="list-item expense-item session-expense-item">
       <div class="info">
         <div class="name expense-note">${escapeHtml(expense.note)}</div>
-        <div class="meta">${new Date(expense.created_at).toLocaleString()}</div>
+        <div class="meta">${formatServerDateTime(expense.created_at)}</div>
       </div>
       <div class="amount">${formatPool(-Number(expense.amount))}</div>
       ${editable ? `<button class="delete-btn" onclick="deleteSessionPoolExpense(${expense.id})" aria-label="删除本场支出">🗑️</button>` : ''}
@@ -1094,7 +1136,7 @@ async function loadPlayerDetail() {
     <div class="list-item small">
       <div class="info">
         <div class="name">第 ${i + 1} 次买入</div>
-        <div class="meta">${new Date(b.created_at).toLocaleString()}</div>
+        <div class="meta">${formatServerDateTime(b.created_at)}</div>
       </div>
       <div class="buyin-record-actions">
         <span class="amount">${formatMoney(b.amount)}</span>
@@ -1319,7 +1361,7 @@ async function showGroupStats(groupId, navigate = true, showError = true) {
             <div class="info">
               <div class="name expense-note">${escapeHtml(expense.note)}</div>
               <div class="meta">
-                ${new Date(expense.created_at).toLocaleString()}
+                ${formatServerDateTime(expense.created_at)}
                 <span class="expense-session-tag">${expense.session_name ? `关联 ${escapeHtml(expense.session_name)}` : '未关联场次'}</span>
               </div>
             </div>

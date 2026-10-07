@@ -138,6 +138,11 @@ try {
     assertTrue(strpos((string) $root, '/css/style.css?v=' . $styleVersion) !== false, 'The app shell has a stale CSS version');
     assertTrue(strpos((string) $root, '/js/app.js?v=' . $appVersion) !== false, 'The app shell has a stale JavaScript version');
     assertTrue(strpos((string) $root, '/fonts/') === false, 'The app shell still downloads a custom font');
+    assertTrue(
+        strpos((string) $root, 'window.POKERNOTE_SERVER_TIMEZONE = ') !== false,
+        'The app shell is missing the server timezone'
+    );
+    assertTrue(strpos((string) $root, '__SERVER_TIMEZONE__') === false, 'The app shell contains an unresolved timezone placeholder');
     assertTrue(strpos((string) $root, '__STYLE_VERSION__') === false, 'The app shell contains an unresolved asset placeholder');
     assertTrue(strpos((string) $root, 'id="session-expense-entry"') !== false, 'The session expense entry is missing');
     assertTrue(strpos((string) $root, 'id="session-expense-details"') !== false, 'The session expense details are missing');

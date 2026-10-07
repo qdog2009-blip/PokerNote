@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+$timezoneCandidates = [getenv('POKERNOTE_TIMEZONE'), getenv('TZ')];
+foreach ($timezoneCandidates as $timezoneCandidate) {
+    if (
+        is_string($timezoneCandidate)
+        && $timezoneCandidate !== ''
+        && in_array($timezoneCandidate, DateTimeZone::listIdentifiers(), true)
+    ) {
+        date_default_timezone_set($timezoneCandidate);
+        break;
+    }
+}
+
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $path = is_string($path) ? rawurldecode($path) : '/';
 
@@ -24,10 +36,14 @@ if ($path !== '/api' && strpos($path, '/api/') !== 0) {
     };
 
     $template = str_replace(
-        ['__STYLE_VERSION__', '__APP_VERSION__'],
+        ['__STYLE_VERSION__', '__APP_VERSION__', '__SERVER_TIMEZONE__'],
         [
             $assetVersion($publicDirectory . '/css/style.css'),
             $assetVersion($publicDirectory . '/js/app.js'),
+            json_encode(
+                date_default_timezone_get(),
+                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+            ),
         ],
         $template
     );
