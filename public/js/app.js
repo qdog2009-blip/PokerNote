@@ -4,6 +4,7 @@ let sessions = [];
 let groups = [];
 let currentSession = null;
 let currentSessionPlayers = [];
+let sessionDetailRequestId = 0;
 let currentGroup = null;
 let currentGroupStats = null;
 let groupExpenseContext = null;
@@ -772,15 +773,61 @@ async function openSession(id) {
   currentSession = session
     ? { ...session, groupId: session.group_id, rakeRate: session.rake_rate }
     : { id };
+  const targetSession = currentSession;
+  resetSessionDetailView();
   document.getElementById('session-title').textContent = session ? session.name : '场次详情';
-  document.getElementById('session-expense-details').open = false;
   updatePlayerHistoryList(); // 加载历史姓名
   showPage('page-session');
-  await loadPlayers();
+  try {
+    await loadPlayers();
+  } catch (err) {
+    if (currentSession !== targetSession) return;
+    document.getElementById('session-detail-status').textContent = `加载失败：${err.message}。请重新进入场次重试。`;
+  }
+}
+
+function resetSessionDetailView() {
+  sessionDetailRequestId++;
+  playerDetailRequestId++;
+  currentSessionPlayers = [];
+  currentPlayer = null;
+  selectedBuyinPlayerId = null;
+  document.getElementById('session-detail-content').hidden = true;
+  document.getElementById('session-stats-button').disabled = true;
+  const status = document.getElementById('session-detail-status');
+  status.textContent = '加载中…';
+  status.hidden = false;
+  document.getElementById('players-list').innerHTML = '';
+  document.getElementById('session-group-summary').textContent = '-';
+  document.getElementById('session-group-select').innerHTML = '';
+  document.getElementById('session-rake-summary').textContent = '-';
+  ['session-rake-rate', 'session-final-pool', 'player-name', 'player-initial'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  const expenseDetails = document.getElementById('session-expense-details');
+  expenseDetails.hidden = true;
+  expenseDetails.open = false;
+  document.getElementById('session-expense-list').innerHTML = '';
+  document.getElementById('session-expense-count').textContent = '0 笔';
+  document.getElementById('session-final-rake-setting').hidden = true;
+  document.getElementById('session-final-rake-note').textContent = '';
+  document.getElementById('session-error-summary').hidden = true;
+  document.getElementById('session-error-amount').textContent = '';
+  hidePlayerHistorySuggestions();
 }
 
 async function loadPlayers() {
-  const data = await api('/sessions/' + currentSession.id);
+  if (!currentSession) return;
+  const targetSession = currentSession;
+  const requestId = ++sessionDetailRequestId;
+  let data;
+  try {
+    data = await api('/sessions/' + targetSession.id);
+  } catch (err) {
+    if (requestId !== sessionDetailRequestId || currentSession !== targetSession) return;
+    throw err;
+  }
+  if (requestId !== sessionDetailRequestId || currentSession !== targetSession) return;
   currentSessionPlayers = Array.isArray(data.players) ? data.players : [];
   const list = document.getElementById('players-list');
   const rakeRate = Number(data.rake_rate || 0);
@@ -860,6 +907,10 @@ async function loadPlayers() {
   } else {
     errorSummary.hidden = true;
   }
+
+  document.getElementById('session-detail-status').hidden = true;
+  document.getElementById('session-detail-content').hidden = false;
+  document.getElementById('session-stats-button').disabled = false;
   
   if (data.players.length === 0) {
     list.innerHTML = `<div class="empty-state">${editable ? '暂无玩家，请添加' : '暂无玩家'}</div>`;

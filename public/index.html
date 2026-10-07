@@ -142,9 +142,10 @@
       <header>
         <button class="btn back" onclick="showPage('page-sessions')">← 返回</button>
         <h2 id="session-title">场次详情</h2>
-        <button class="btn small" onclick="showSessionStats()">📊 统计</button>
+        <button class="btn small" id="session-stats-button" onclick="showSessionStats()">📊 统计</button>
       </header>
-      <div class="container">
+      <div id="session-detail-status" class="empty-state" role="status" hidden></div>
+      <div id="session-detail-content" class="container" hidden>
         <div class="group-setting">
           <div class="group-setting-copy">
             <span class="group-icon">⌗</span>
