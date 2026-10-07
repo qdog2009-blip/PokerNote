@@ -1057,21 +1057,17 @@ async function openPlayer(id) {
 async function loadPlayerDetail() {
   const data = await api('/players/' + currentPlayer.id + '/buyins');
   const buyins = data;
+  const player = currentSessionPlayers.find(item => Number(item.id) === Number(currentPlayer.id));
+  if (!player) return;
   
   // 计算总买入
   const totalBuyin = buyins.reduce((sum, b) => sum + b.amount, 0);
   
-  // 获取玩家信息
-  const playerInfo = await api('/sessions/' + currentSession.id);
-  const player = playerInfo.players.find(p => p.id === currentPlayer.id);
-  if (player) {
-    currentPlayer.name = player.name;
-    document.getElementById('player-title').textContent = player.name;
-  }
-  const finalBalance = player ? player.final_balance : null;
-  const rakeRate = Number(playerInfo.rake_rate || 0);
+  currentPlayer.name = player.name;
+  document.getElementById('player-title').textContent = player.name;
+  const finalBalance = player.final_balance;
+  const rakeRate = Number(currentSession.rakeRate || 0);
   const result = calculatePlayerResult(totalBuyin, finalBalance, rakeRate);
-  currentSession.rakeRate = rakeRate;
   
   // 更新统计
   document.getElementById('player-total-buyin').textContent = formatMoney(totalBuyin);
