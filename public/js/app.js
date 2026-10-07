@@ -7,6 +7,7 @@ let currentSessionPlayers = [];
 let sessionDetailRequestId = 0;
 let currentGroup = null;
 let currentGroupStats = null;
+let groupStatsRequestId = 0;
 let groupExpenseContext = null;
 let groupExpenseSubmitting = false;
 let currentPlayer = null;
@@ -1390,9 +1391,40 @@ async function showSessionStats() {
   }
 }
 
+function resetGroupStatsView() {
+  currentGroupStats = null;
+  document.getElementById('group-stats-content').hidden = true;
+  const status = document.getElementById('group-stats-status');
+  status.textContent = '加载中…';
+  status.hidden = false;
+  document.getElementById('btn-group-share').hidden = true;
+  document.getElementById('btn-add-group-expense').hidden = true;
+  ['group-player-list', 'group-session-list', 'group-expense-list'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+  [
+    'group-stat-access', 'group-stat-session-count', 'group-stat-total-buyin',
+    'group-stat-total-settled', 'group-stat-total-rake', 'group-stat-pool-expenses',
+    'group-stat-error', 'group-stat-water-pool'
+  ].forEach(id => {
+    document.getElementById(id).textContent = '-';
+  });
+  document.getElementById('group-expense-count').textContent = '0 笔';
+  document.getElementById('group-expense-details').open = false;
+}
+
 async function showGroupStats(groupId, navigate = true, showError = true) {
+  if (!navigate && currentGroup && Number(currentGroup.id) !== Number(groupId)) return false;
+  const requestId = ++groupStatsRequestId;
+  if (navigate) {
+    currentGroup = groups.find(group => Number(group.id) === Number(groupId)) || { id: groupId };
+    resetGroupStatsView();
+    document.getElementById('group-stats-title').textContent = currentGroup.name || '分组统计';
+    showPage('page-group-stats');
+  }
   try {
     const data = await api('/groups/' + groupId + '/stats');
+    if (requestId !== groupStatsRequestId) return false;
     currentGroup = data.group;
     currentGroupStats = data;
     const editable = canInput(data.group.access_level);
@@ -1483,13 +1515,16 @@ async function showGroupStats(groupId, navigate = true, showError = true) {
         }).join('')
       : '<div class="empty-state">暂无玩家统计</div>';
 
-    if (navigate) {
-      document.getElementById('group-expense-details').open = false;
-      showPage('page-group-stats');
-    }
+    document.getElementById('group-stats-status').hidden = true;
+    document.getElementById('group-stats-content').hidden = false;
     return true;
   } catch (err) {
-    if (showError) alert(err.message);
+    if (requestId !== groupStatsRequestId) return false;
+    if (navigate) {
+      document.getElementById('group-stats-status').textContent = `加载失败：${err.message}。请重新进入分组重试。`;
+    } else if (showError) {
+      alert(err.message);
+    }
     return false;
   }
 }
