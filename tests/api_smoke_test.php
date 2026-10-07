@@ -135,10 +135,9 @@ try {
 
     $styleVersion = substr((string) hash_file('sha256', $projectRoot . '/public/css/style.css'), 0, 12);
     $appVersion = substr((string) hash_file('sha256', $projectRoot . '/public/js/app.js'), 0, 12);
-    $fontVersion = substr((string) hash_file('sha256', $projectRoot . '/public/fonts/NotoSansSC.ttf'), 0, 12);
     assertTrue(strpos((string) $root, '/css/style.css?v=' . $styleVersion) !== false, 'The app shell has a stale CSS version');
     assertTrue(strpos((string) $root, '/js/app.js?v=' . $appVersion) !== false, 'The app shell has a stale JavaScript version');
-    assertTrue(strpos((string) $root, '/fonts/NotoSansSC.ttf?v=' . $fontVersion) !== false, 'The app shell has a stale font version');
+    assertTrue(strpos((string) $root, '/fonts/') === false, 'The app shell still downloads a custom font');
     assertTrue(strpos((string) $root, '__STYLE_VERSION__') === false, 'The app shell contains an unresolved asset placeholder');
     assertTrue(strpos((string) $root, 'id="session-expense-entry"') !== false, 'The session expense entry is missing');
     assertTrue(strpos((string) $root, 'id="session-expense-details"') !== false, 'The session expense details are missing');

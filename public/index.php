@@ -24,11 +24,10 @@ if ($path !== '/api' && strpos($path, '/api/') !== 0) {
     };
 
     $template = str_replace(
-        ['__STYLE_VERSION__', '__APP_VERSION__', '__FONT_VERSION__'],
+        ['__STYLE_VERSION__', '__APP_VERSION__'],
         [
             $assetVersion($publicDirectory . '/css/style.css'),
             $assetVersion($publicDirectory . '/js/app.js'),
-            $assetVersion($publicDirectory . '/fonts/NotoSansSC.ttf'),
         ],
         $template
     );
