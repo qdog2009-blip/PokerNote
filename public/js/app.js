@@ -5,6 +5,7 @@ let groups = [];
 let currentSession = null;
 let currentSessionPlayers = [];
 let sessionDetailRequestId = 0;
+let sessionStatsRequestId = 0;
 let currentGroup = null;
 let currentGroupStats = null;
 let groupStatsRequestId = 0;
@@ -1343,9 +1344,29 @@ async function settle(type) {
 
 // ==================== 统计相关 ====================
 
+function resetSessionStatsView() {
+  document.getElementById('session-stats-content').hidden = true;
+  const status = document.getElementById('session-stats-status');
+  status.textContent = '加载中…';
+  status.hidden = false;
+  document.getElementById('stats-list').innerHTML = '';
+  [
+    'stat-total-buyin', 'stat-rake-rate', 'stat-error', 'stat-water-pool',
+    'stat-pool-expenses', 'stat-rake-balance'
+  ].forEach(id => {
+    document.getElementById(id).textContent = '-';
+  });
+}
+
 async function showSessionStats() {
+  if (!currentSession) return false;
+  const targetSession = currentSession;
+  const requestId = ++sessionStatsRequestId;
+  resetSessionStatsView();
+  showPage('page-stats');
   try {
-    const data = await api('/sessions/' + currentSession.id + '/stats');
+    const data = await api('/sessions/' + targetSession.id + '/stats');
+    if (requestId !== sessionStatsRequestId || currentSession !== targetSession) return false;
     
     document.getElementById('stat-total-buyin').textContent = formatMoney(data.totalBuyins);
     document.getElementById('stat-rake-rate').textContent = formatRate(data.rakeRate);
@@ -1385,9 +1406,13 @@ async function showSessionStats() {
       `;
     }).join('');
     
-    showPage('page-stats');
+    document.getElementById('session-stats-status').hidden = true;
+    document.getElementById('session-stats-content').hidden = false;
+    return true;
   } catch (err) {
-    alert(err.message);
+    if (requestId !== sessionStatsRequestId || currentSession !== targetSession) return false;
+    document.getElementById('session-stats-status').textContent = `加载失败：${err.message}。请返回场次重试。`;
+    return false;
   }
 }
 
