@@ -1251,6 +1251,22 @@ select:focus {
   white-space: nowrap;
 }
 
+#page-player .input-row {
+  flex-wrap: nowrap;
+}
+
+#page-player .input-row input {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
+  min-height: 44px;
+}
+
+#page-player .input-row .btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
 .player-name-picker {
   position: relative;
   flex: 1;
